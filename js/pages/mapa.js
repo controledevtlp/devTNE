@@ -1,0 +1,1639 @@
+﻿/* ============================================================
+ * Página: Mapa Operacional TNE
+ * ============================================================
+ * Mapa Leaflet com dados de sites vindos da ponte local
+ * (http://localhost:5057/api/mapa) que acessa o PHP interno
+ * via VPN, ou fallback para dados importados do Genesis HTML.
+ *
+ * Exibe:
+ *  • Marcadores dos sites fora (FLAG 1 por padrão)
+ *  • Toggle FLAG 0 (demais sites)
+ *  • Polylines enlaces MW (coloridas por fornecedor)
+ *  • Marcadores Hub FO
+ *  • Busca por site, END_ID ou cidade
+ * ============================================================ */
+(function (TNE) {
+  TNE.pages = TNE.pages || {};
+  var U = TNE.ui, C = TNE.constants;
+
+  var LS_COORDS   = 'tne_coordMap';
+  var LS_MW       = 'tne_mwData';
+  var LS_FO       = 'tne_foData';
+  var LS_MARKERS  = 'tne_mapaMarkers';  // sites fora com coordenadas (markerData do Genesis)
+  var PONTE_URL   = 'http://localhost:5057';
+
+  // ── Cores exatas do mapa original ───────────────────────────
+  var MW_CORES = {
+    'NOKIA':    '#800080',
+    'HUAWEI':   '#d20014',
+    'CERAGON':  '#dcf014',
+    'ERICSSON': '#000078',
+    'SIAE':     '#14c8f0',
+    'ZTE':      '#2ecc71',
+    'default':  '#7f8c8d'
+  };
+
+  // ── Utilitários de storage ─────────────────────────────────
+  function loadLS(key) {
+    try { return JSON.parse(localStorage.getItem(key) || 'null'); } catch(e){ return null; }
+  }
+  function saveLS(key, val) {
+    try { localStorage.setItem(key, JSON.stringify(val)); } catch(e){}
+  }
+  // Parseia coordenada com vírgula decimal, grau (°) e espaço-não-quebrável
+  function parseCoord(v) {
+    if (v == null) return NaN;
+    return parseFloat(String(v).replace(/\u00a0/g,'').replace(/°/g,'').replace(',','.'));
+  }
+
+  function salvarMapaDados(coordMap, mwData, foData, markers) {
+    saveLS(LS_COORDS, coordMap);
+    // Cache em memória: garante que dashboard.js acesse os dados mesmo se localStorage falhar
+    TNE._mwDataCache = mwData || [];
+    TNE._foDataCache = foData || [];
+    var mwSave = (mwData||[]).map(function(l){ return { Enlace2:l.Enlace2||'', LAT_A:l.LAT_A, LONG_A:l.LONG_A, LAT_B:l.LAT_B, LONG_B:l.LONG_B, FORNECEDOR:l.FORNECEDOR||'' }; });
+    var foSave = (foData||[]).map(function(h){ return { NEName:h.NEName||'', HUB:h.HUB||'', LAT_A:h.LAT_A, LONG_A:h.LONG_A, FORNECEDOR:h.FORNECEDOR||'' }; });
+    saveLS(LS_MW, mwSave);
+    saveLS(LS_FO, foSave);
+    if (markers !== undefined) {
+      var mSave = markers.map(function(m){ return { NEName:m.NEName||'', Latitude:m.Latitude||m.lat||'', Longitude:m.Longitude||m.lon||'', ENDID:m.ENDID||'', municipio:m.municipio||'', flag:m.flag, tempo:m.tempo||0 }; });
+      saveLS(LS_MARKERS, mSave);
+    }
+  }
+  TNE.mapaSetDados = salvarMapaDados;
+
+  // ── Parsear Genesis Mapa HTML → markerData + mwData + foData + coordMap ──
+  // markerData = sites fora com campos: NEName, Latitude, Longitude, ENDID, tempo, queda …
+  // Antes só extraía coords de mwData/foData — agora extrai do markerData (fonte principal).
+  function parseGenesisParaMapa(htmlText) {
+    function cleanJSON(raw) { return raw.replace(/\u00a0/g,'').replace(/\\u00a0/g,''); }
+    function extractVar(name) {
+      var patterns = [
+        new RegExp(name + '\\s*=\\s*(\\[[\\s\\S]*?\\])\\s*;'),
+        new RegExp(name + '\\s*=\\s*(\\[[\\s\\S]*?\\])\\s*,'),
+        new RegExp(name + '\\s*=\\s*(\\[[\\s\\S]*?\\])\\s*\\n'),
+        new RegExp(name + '\\s*=\\s*(\\[[\\s\\S]*?\\])')
+      ];
+      for (var pi = 0; pi < patterns.length; pi++) {
+        var m = htmlText.match(patterns[pi]);
+        if (m) {
+          try { var r = JSON.parse(cleanJSON(m[1])); if (Array.isArray(r) && r.length) return r; } catch(e){}
+        }
+      }
+      return [];
+    }
+
+    var markerData = extractVar('markerData');
+    var mwData     = extractVar('mwData');
+    var foData     = extractVar('foData');
+    console.log('[Mapa TNE] parseGenesis: markerData=' + markerData.length + ' mwData=' + mwData.length + ' foData=' + foData.length,
+                markerData.length ? markerData[0] : '(vazio)');
+
+    var coordMap = {};
+
+    // 1) Sites fora — fonte principal (Latitude/Longitude capital, vírgula decimal)
+    markerData.forEach(function(site) {
+      var lat = parseCoord(site.Latitude  || site.latitude  || '');
+      var lon = parseCoord(site.Longitude || site.longitude || '');
+      var eid = String(site.ENDID || site.endId || '').trim();
+      if (eid && !isNaN(lat) && !isNaN(lon) && lat && lon && !coordMap[eid]) {
+        coordMap[eid] = [lat, lon];
+      }
+    });
+
+    // 2) Extremos dos enlaces MW (LAT_A/LONG_A … LAT_B/LONG_B)
+    mwData.forEach(function(link) {
+      var parts = (link.Enlace2||'').split(' - ').map(function(p){ return p.trim(); }).filter(Boolean);
+      var coords = [
+        [parseCoord(link.LAT_A), parseCoord(link.LONG_A)],
+        [parseCoord(link.LAT_B), parseCoord(link.LONG_B)]
+      ];
+      parts.slice(0,2).forEach(function(eid, idx) {
+        var lat = coords[idx][0], lon = coords[idx][1];
+        if (eid && !isNaN(lat) && !isNaN(lon) && lat && lon && !coordMap[eid]) {
+          coordMap[eid] = [lat, lon];
+        }
+      });
+    });
+
+    // 3) Hubs FO
+    foData.forEach(function(hub) {
+      var m2 = (hub.HUB||'').match(/\((\w+)\)/);
+      var eid = m2 ? m2[1] : (hub.NEName||'');
+      var lat = parseCoord(hub.LAT_A), lon = parseCoord(hub.LONG_A);
+      if (eid && !isNaN(lat) && !isNaN(lon) && lat && lon && !coordMap[eid]) {
+        coordMap[eid] = [lat, lon];
+      }
+    });
+
+    // ── Fallback DOM-based ──────────────────────────────────────
+    if (!markerData.length && !mwData.length) {
+      try {
+        var doc2 = new DOMParser().parseFromString(htmlText, 'text/html');
+        var scripts = doc2.querySelectorAll('script');
+        scripts.forEach(function(s) {
+          var src = s.textContent || '';
+          var allArrays = src.match(/\[[\s\S]{20,}\]/g) || [];
+          allArrays.forEach(function(raw) {
+            if (markerData.length) return;
+            try {
+              var arr = JSON.parse(cleanJSON(raw));
+              if (!Array.isArray(arr) || !arr.length) return;
+              var first = arr[0];
+              if (first && (first.NEName || first.neName) && (first.Latitude || first.latitude || first.LAT_A)) {
+                markerData = arr;
+              }
+            } catch(e){}
+          });
+        });
+      } catch(e2) {}
+    }
+
+    var debugVars = [];
+    if (/markerData/.test(htmlText)) debugVars.push('markerData');
+    if (/mwData/.test(htmlText))     debugVars.push('mwData');
+    if (/foData/.test(htmlText))     debugVars.push('foData');
+    var debugInfo = {
+      varsFound: debugVars, markerLen: markerData.length, mwLen: mwData.length, foLen: foData.length,
+      htmlLen: htmlText.length,
+      snippet: htmlText.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200)
+    };
+    console.log('[Mapa TNE] parseGenesis:', debugInfo, markerData.length ? markerData[0] : null);
+
+    salvarMapaDados(coordMap, mwData, foData, markerData);
+    return {
+      coordMap: coordMap, mwData: mwData, foData: foData, markerData: markerData,
+      coordCount: Object.keys(coordMap).length, siteCount: markerData.length,
+      debugInfo: debugInfo
+    };
+  }
+  TNE.mapaParseGenesis = parseGenesisParaMapa;
+
+  // ── PÁGINA ─────────────────────────────────────────────────
+  TNE.pages.mapa = function(container, ctx) {
+    var data      = ctx.data || {};
+    var readOnly  = !!ctx.readOnly;
+    var incidents = data.incidentsEnriched || [];
+    var tasks     = data.tasksEnriched     || [];
+
+    // Dados de mapa: contexto > localStorage > estáticos embutidos > vazio
+    var coordMap = ctx.mapaCoordMap || loadLS(LS_COORDS) || TNE.defaultCoordMap || {};
+    var mapaMarkers = loadLS(LS_MARKERS) || [];
+
+    // Enriquecer coordMap com coords do snapshot slim (para o dashboard público funcionar com incidentes dinâmicos)
+    if (ctx.mapaMarkers && ctx.mapaMarkers.length) {
+      ctx.mapaMarkers.forEach(function(s) {
+        var eid = s.ENDID || s.endId || '';
+        var lat = parseCoord(s.lat || s.Latitude);
+        var lon = parseCoord(s.lon || s.Longitude);
+        if (eid && !isNaN(lat) && !isNaN(lon) && !coordMap[eid]) {
+          coordMap[eid] = [lat, lon];
+        }
+      });
+    }
+
+    // mwData e foData: formato compacto [la,loa,lb,lob,enlace2,forn] → normalizar para objetos
+    function _normMw(x) {
+      if (!Array.isArray(x)) return x;
+      return { LAT_A: x[0], LONG_A: x[1], LAT_B: x[2], LONG_B: x[3], Enlace: x[4], Enlace2: x[4], FORNECEDOR: x[5] };
+    }
+    function _normFo(x) {
+      if (!Array.isArray(x)) return x;
+      return { LAT_A: x[0], LONG_A: x[1], HUB: x[2], NEName: x[3] };
+    }
+    var rawMw = ctx.mapaMwData || loadLS(LS_MW) || TNE.defaultMwData || [];
+    var rawFo = ctx.mapaFoData || loadLS(LS_FO) || TNE.defaultFoData || [];
+    var mwData = rawMw.map(_normMw);
+    var foData = rawFo.map(_normFo);
+
+    // ── Construir lookup ENDID → {site} a partir das tarefas ─
+    var siteByEndId = {};
+    tasks.forEach(function(t) {
+      var eid = (t.enderecoId||'').trim();
+      if (eid && !siteByEndId[eid]) siteByEndId[eid] = t.siteId || '';
+    });
+    incidents.forEach(function(i) {
+      var eid = (i.enderecoId||i.endId||'').trim();
+      if (eid && !siteByEndId[eid]) siteByEndId[eid] = i.site || '';
+    });
+
+    // Estado do mapa
+    var mapState = { showFlag0: false, showMW: true, showFO: false, flagFilter: '1' };
+    var mapInstance = null, layers = {};
+    var sitesFlag1 = [], sitesFlag0Raw = [];
+    var semCoordList = [];   // [{eid, site, cidade}] sem coordenada
+    var comCoordList = [];   // [{eid, site, cidade, coordStr}] com coordenada (editáveis)
+    var semCoordPanelEl = null;
+
+    // Filtros ativos
+    var _filtros = { regiao: null, soTSK: false, legSemTSK: true, legComTSK: true, legRecente: true };
+    var _lastStats = { total: 0, comTSK: 0, semCoord: 0 };
+    var _mwVendorVis = { NOKIA: true, HUAWEI: true, CERAGON: true, ERICSSON: true, SIAE: true, ZTE: true };
+    var _cityCircle = null;
+    var _legEls = [];
+    var _boundaryLayer = null;
+    var _boundaryCache = {};
+
+    // ── Geocodificação TSK (Nominatim) — cache em localStorage ───────────
+    var GEO_CACHE_KEY = 'tne_geo_cache';
+    var geoCache = (function() { try { return JSON.parse(localStorage.getItem(GEO_CACHE_KEY)||'{}'); } catch(e){ return {}; } })();
+    function geocodificarEndereco(logradouro, cidade, bairro, cb) {
+      var q = [logradouro, bairro, cidade, 'Brasil'].filter(Boolean).join(', ');
+      if (geoCache[q]) { cb(null, geoCache[q]); return; }
+      fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(q), {
+        headers: { 'Accept-Language': 'pt-BR,pt', 'User-Agent': 'ControleTMG/1.0' }
+      })
+      .then(function(r){ return r.json(); })
+      .then(function(data){
+        if (!data || !data.length) { cb('Não encontrado'); return; }
+        var res = { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon), display: data[0].display_name };
+        try { geoCache[q] = res; localStorage.setItem(GEO_CACHE_KEY, JSON.stringify(geoCache)); } catch(e){}
+        cb(null, res);
+      })
+      .catch(function(e){ cb('Erro na geocodificação: ' + e.message); });
+    }
+
+    // ── Rota / distância ─────────────────────────────────────────────────
+    var rotaLayer = null;
+    var rotaPainelEl = null;
+    function haversineKm(lat1, lon1, lat2, lon2) {
+      var R = 6371;
+      var dLat = (lat2 - lat1) * Math.PI / 180;
+      var dLon = (lon2 - lon1) * Math.PI / 180;
+      var a = Math.sin(dLat/2)*Math.sin(dLat/2) +
+              Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)*Math.sin(dLon/2);
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
+    function fmtTempo(seg) {
+      if (seg < 60) return seg + 's';
+      var m = Math.round(seg/60); if (m < 60) return m + 'min';
+      return Math.floor(m/60) + 'h' + (m%60 ? (m%60)+'min' : '');
+    }
+
+    // ── Header ─────────────────────────────────────────────────
+    container.appendChild(U.pageHeader('Mapa Operacional',
+      'Sites fora georreferenciados, enlaces MW e hubs FO em tempo real.'));
+
+    // ── Barra de controles ─────────────────────────────────────
+    var siteInput = U.h('input', {
+      class: 'tne-input',
+      placeholder: 'Site ou END_ID...',
+      style: { flex: '1', maxWidth: '190px', fontSize: '13px' }
+    });
+    var cityInput = U.h('input', {
+      class: 'tne-input',
+      placeholder: 'Buscar cidade...',
+      style: { flex: '1', maxWidth: '160px', fontSize: '13px' }
+    });
+    var searchInput = siteInput; // compatibilidade
+    var _cityDlId = 'tne-city-dl';
+    if (document.getElementById(_cityDlId)) document.getElementById(_cityDlId).remove();
+    var _cityDL = document.createElement('datalist');
+    _cityDL.id = _cityDlId;
+    document.body.appendChild(_cityDL);
+    cityInput.setAttribute('list', _cityDlId);
+
+    function mkCheck(label) {
+      var chk = U.h('input', { type: 'checkbox' });
+      var lbl = U.h('label', { style: { display:'flex',alignItems:'center',gap:'6px',fontSize:'12px',cursor:'pointer',whiteSpace:'nowrap' }}, [chk, U.h('span',{text:label})]);
+      return { chk: chk, el: lbl };
+    }
+
+    var ckFlag0 = mkCheck('FLAG 0 (demais sites)');
+    var ckMW    = mkCheck('Enlaces MW'); ckMW.chk.checked = true;
+    var ckFO    = mkCheck('Hubs FO');
+
+    var statsEl = U.h('div', { style: { fontSize:'12px', color:'var(--tne-muted)', display:'flex', gap:'14px', flexWrap:'wrap', alignItems:'center' } });
+
+    // Botão buscar via ponte
+    var btnPonte = U.h('button', {
+      class: 'tne-btn tne-btn-primary clickable',
+      style: { fontSize:'12px', padding:'4px 14px', display:'inline-flex', alignItems:'center', gap:'6px' }
+    }, [U.h('span',{text:'Buscar sites (ponte + VPN)' })]);
+
+    // Botão importar HTML (fallback)
+    var btnImport = U.h('button', {
+      class: 'tne-btn tne-btn-ghost clickable',
+      style: { fontSize:'12px', padding:'4px 12px', display:'inline-flex', alignItems:'center', gap:'6px', opacity:'0.8' }
+    }, [U.h('span',{text:'Importar Genesis HTML' })]);
+    var fileInput = U.h('input', { type:'file', accept:'.html,.htm', style:{ display:'none' } });
+    container.appendChild(fileInput);
+
+    var ctrlBar = U.h('div', {
+      style: { display:'flex', alignItems:'center', gap:'12px', flexWrap:'wrap', marginBottom:'10px',
+               padding:'10px 14px', background:'var(--tne-card)', borderRadius:'10px', border:'1px solid var(--tne-border)',
+               position:'relative', zIndex:'1' }
+    }, [siteInput, cityInput, ckFlag0.el, ckMW.el, ckFO.el]
+       .concat(readOnly ? [] : [U.h('div', {style:{marginLeft:'auto',display:'flex',gap:'8px'}}, [btnPonte, btnImport])]));
+
+    container.appendChild(ctrlBar);
+    container.appendChild(statsEl);
+
+    // ── Barra de filtros por região ────────────────────────────
+    var REGIOES_FILTER = C.REGIOES.filter(function(r){ return r !== 'OTHERS'; });
+    var _regiaoChips = {};
+    var _regiaoCountEls = {};
+    var regionBar = U.h('div', { style:{ display:'flex', gap:'6px', flexWrap:'wrap', marginTop:'6px', marginBottom:'2px' } });
+    REGIOES_FILTER.forEach(function(r) {
+      var cntEl = U.h('span', {
+        style: { fontSize:'10px', display:'block', fontWeight:'400', opacity:'0.7', marginTop:'2px', lineHeight:'1', letterSpacing:'0.01em' },
+        text: '—'
+      });
+      var chip = U.h('button', {
+        class: 'tne-btn tne-btn-ghost clickable',
+        style: { fontSize:'11px', padding:'4px 12px', borderRadius:'10px', transition:'all .15s', border:'1px solid var(--tne-border)', textAlign:'center', lineHeight:'1.35' }
+      }, [
+        U.h('span', { style:{ display:'block', fontWeight:'600' }, text: C.REGIAO_LABELS[r] || r }),
+        cntEl
+      ]);
+      _regiaoChips[r] = chip;
+      _regiaoCountEls[r] = cntEl;
+      chip.addEventListener('click', function() {
+        if (_filtros.regiao === r) {
+          _filtros.regiao = null;
+          chip.style.background=''; chip.style.color=''; chip.style.borderColor='var(--tne-border)'; chip.style.fontWeight='';
+        } else {
+          _filtros.regiao = r;
+          Object.values(_regiaoChips).forEach(function(c){ c.style.background=''; c.style.color=''; c.style.borderColor='var(--tne-border)'; c.style.fontWeight=''; });
+          chip.style.background='var(--tne-primary)'; chip.style.color='#0a160f'; chip.style.borderColor='var(--tne-primary)'; chip.style.fontWeight='700';
+        }
+        applyMarkerFilter();
+      });
+      regionBar.appendChild(chip);
+    });
+    // Preencher contagens por região (dedup por END_id por região)
+    (function() {
+      var tasksAt = tasks.filter(function(t) {
+        var s = (t.status||'').toUpperCase().replace(/[ÁÀÂÃ]/g,'A').replace(/[ÉÈ]/g,'E');
+        return s.indexOf('INICIADO') >= 0 && s !== 'CONCLUIDA' && s !== 'CANCELADA' && s !== 'CANCELADO';
+      });
+      var incAt = incidents.filter(function(i){ return (i.statusTrat||'').toUpperCase() !== 'RESOLVIDO'; });
+      var cnt = {}, seen = {};
+      incAt.forEach(function(inc) {
+        var r = inc.regiao || 'OTHERS';
+        if (REGIOES_FILTER.indexOf(r) < 0) return;
+        var eid = (inc.enderecoId||'').trim();
+        var key = r + '|' + eid;
+        if (seen[key]) return;
+        seen[key] = true;
+        if (!cnt[r]) cnt[r] = { total:0, comTSK:0 };
+        cnt[r].total++;
+        if (U.tskAberta && U.tskAberta(inc, tasksAt)) cnt[r].comTSK++;
+      });
+      REGIOES_FILTER.forEach(function(r) {
+        var el = _regiaoCountEls[r]; if (!el) return;
+        var c = cnt[r] || { total:0, comTSK:0 };
+        if (!c.total) { el.textContent = '—'; return; }
+        el.textContent = c.total + ' · ✓' + c.comTSK + ' · ○' + (c.total - c.comTSK);
+      });
+    })();
+    var btnRelatorio = U.h('button', {
+      class: 'tne-btn tne-btn-ghost clickable',
+      style: { fontSize:'11px', padding:'3px 12px', borderRadius:'999px', border:'1px solid var(--tne-border)', marginLeft:'auto', whiteSpace:'nowrap' },
+      text: '📋 Copiar relatório'
+    });
+    btnRelatorio.addEventListener('click', gerarRelatorio);
+    regionBar.appendChild(btnRelatorio);
+
+    var btnXlsx = U.h('button', {
+      class: 'tne-btn tne-btn-ghost clickable',
+      style: { fontSize:'11px', padding:'3px 10px', borderRadius:'999px', border:'1px solid var(--tne-border)', whiteSpace:'nowrap', opacity:'0.75' },
+      text: '⬇ coords.xlsx'
+    });
+    btnXlsx.addEventListener('click', exportarCoordXlsx);
+    if (!readOnly) regionBar.appendChild(btnXlsx);
+
+    container.appendChild(regionBar);
+
+    // ── Painel de rota ────────────────────────────────────────────────────
+    (function buildRotaPanel() {
+      var letras = 'ABCDEFGHIJKLMNOP';
+      var expanded = false;
+      var pontoInputs = []; // {inp, el}
+
+      // Datalist com todos os ENDIDs + nome
+      var dlId = 'rota-sites-dl';
+      if (!document.getElementById(dlId)) {
+        var dl = document.createElement('datalist');
+        dl.id = dlId;
+        Object.keys(coordMap).forEach(function(eid) {
+          var opt = document.createElement('option');
+          opt.value = eid + (siteByEndId[eid] ? ' — ' + siteByEndId[eid] : '');
+          dl.appendChild(opt);
+        });
+        document.body.appendChild(dl);
+      }
+
+      var pontosWrap = U.h('div', { style: { display:'flex', flexDirection:'column', gap:'5px' } });
+      var resultDiv  = U.h('div', { style: { display:'none', marginTop:'8px', fontSize:'12px' } });
+
+      function criarLinhaPonto(idx) {
+        var inp = U.h('input', {
+          type: 'text', list: dlId,
+          placeholder: 'ENDID ou nome do site...',
+          style: { flex:'1', background:'var(--tne-card2)', border:'1px solid var(--tne-border)',
+                   borderRadius:'6px', color:'var(--tne-fg)', padding:'4px 8px', fontSize:'12px',
+                   outline:'none' }
+        });
+        var btnX = U.h('button', {
+          style: { background:'none', border:'none', color:'var(--tne-muted)', cursor:'pointer', fontSize:'15px', lineHeight:'1', padding:'0 4px', flexShrink:'0' },
+          text: '×'
+        });
+        var badge = U.h('span', {
+          style: { fontSize:'11px', fontWeight:'700', color:'var(--tne-primary)', width:'16px', textAlign:'center', flexShrink:'0' },
+          text: letras[idx] || String(idx+1)
+        });
+        var linha = U.h('div', { style: { display:'flex', alignItems:'center', gap:'6px' } },
+          [badge, inp, btnX]);
+        var entry = { inp: inp, el: linha, badge: badge };
+        pontoInputs.push(entry);
+
+        btnX.addEventListener('click', function() {
+          var i = -1;
+          for (var j=0;j<pontoInputs.length;j++) { if (pontoInputs[j].el === linha) { i=j; break; } }
+          if (pontoInputs.length > 2 && i >= 0) {
+            pontoInputs.splice(i,1);
+            pontosWrap.removeChild(linha);
+            for (var k=0;k<pontoInputs.length;k++) pontoInputs[k].badge.textContent = letras[k]||String(k+1);
+          } else { inp.value = ''; }
+        });
+        return linha;
+      }
+
+      pontosWrap.appendChild(criarLinhaPonto(0));
+      pontosWrap.appendChild(criarLinhaPonto(1));
+
+      var btnAdd = U.h('button', {
+        class: 'tne-btn tne-btn-ghost clickable',
+        style: { fontSize:'11px', padding:'2px 10px' }, text: '+ Adicionar ponto'
+      });
+      var btnCalc = U.h('button', {
+        class: 'tne-btn tne-btn-primary clickable',
+        style: { fontSize:'11px', padding:'2px 12px' }, text: 'Calcular Rota'
+      });
+      var btnLimpar = U.h('button', {
+        class: 'tne-btn tne-btn-ghost clickable',
+        style: { fontSize:'11px', padding:'2px 10px' }, text: 'Limpar'
+      });
+
+      btnAdd.addEventListener('click', function() {
+        if (pontoInputs.length >= 8) { U.toast('Máximo de 8 pontos.', 'err'); return; }
+        var novaLinha = criarLinhaPonto(pontoInputs.length);
+        pontosWrap.appendChild(novaLinha);
+      });
+
+      function parseEid(val) {
+        val = (val||'').trim();
+        var sep = val.indexOf(' — ');
+        return (sep > 0 ? val.substring(0, sep) : val).trim();
+      }
+
+      btnCalc.addEventListener('click', function() {
+        var pts = [];
+        pontoInputs.forEach(function(p) {
+          var eid = parseEid(p.inp.value);
+          if (!eid) return;
+          var c = coordMap[eid];
+          if (!c) {
+            var low = eid.toLowerCase();
+            var keys = Object.keys(coordMap);
+            for (var i=0;i<keys.length;i++) { if (keys[i].toLowerCase()===low) { c=coordMap[keys[i]]; eid=keys[i]; break; } }
+          }
+          if (!c) { U.toast('Site "'+eid+'" não encontrado.','err'); return; }
+          pts.push({ lat:c[0], lon:c[1], nome: eid+(siteByEndId[eid]?' — '+siteByEndId[eid]:'') });
+        });
+        if (pts.length < 2) { U.toast('Informe pelo menos 2 sites válidos.','err'); return; }
+        calcularRota(pts, resultDiv);
+      });
+
+      btnLimpar.addEventListener('click', function() {
+        pontoInputs.forEach(function(p){ p.inp.value=''; });
+        while (pontoInputs.length > 2) { pontosWrap.removeChild(pontoInputs.pop().el); }
+        for (var k=0;k<pontoInputs.length;k++) pontoInputs[k].badge.textContent=letras[k];
+        if (rotaLayer) { rotaLayer.remove(); rotaLayer=null; }
+        resultDiv.style.display='none'; resultDiv.innerHTML='';
+      });
+
+      var acoesEl = U.h('div', { style:{display:'flex',gap:'8px',alignItems:'center',marginTop:'6px',flexWrap:'wrap'} },
+        [btnAdd, btnCalc, btnLimpar]);
+
+      var bodyEl = U.h('div', { style:{marginTop:'8px',display:'none'} }, [pontosWrap, acoesEl, resultDiv]);
+
+      var toggleBtn = U.h('button', {
+        style:{background:'none',border:'none',color:'var(--tne-muted)',cursor:'pointer',fontSize:'12px',padding:'0'},
+        text: '▸'
+      });
+
+      var headerEl = U.h('div', {
+        style:{display:'flex',alignItems:'center',justifyContent:'space-between',cursor:'pointer'}
+      }, [
+        U.h('span',{style:{fontSize:'12px',fontWeight:'600',color:'var(--tne-fg)'},text:'📏 Calcular Rota de Atendimento'}),
+        toggleBtn
+      ]);
+      headerEl.addEventListener('click', function() {
+        expanded = !expanded;
+        bodyEl.style.display = expanded ? '' : 'none';
+        toggleBtn.textContent = expanded ? '▾' : '▸';
+      });
+
+      rotaPainelEl = U.h('div', {
+        style:{background:'var(--tne-card)',border:'1px solid var(--tne-border)',borderRadius:'8px',
+               padding:'10px 14px',marginTop:'6px',marginBottom:'2px',position:'relative',zIndex:'1'}
+      }, [headerEl, bodyEl]);
+      container.appendChild(rotaPainelEl);
+    })();
+
+    // ── Container do mapa ──────────────────────────────────────
+    // z-index do mapa menor que a sidebar (a sidebar usa z-index 200+)
+    var mapDiv = U.h('div', {
+      id: 'tne-mapa-leaflet',
+      style: { height:'65vh', borderRadius:'12px', overflow:'hidden',
+               border:'1px solid var(--tne-border)', marginTop:'10px',
+               position:'relative', zIndex:'0' }
+    });
+    container.appendChild(mapDiv);
+
+    // ── Legenda completa ───────────────────────────────────────
+    var legItems = [
+      { cor:'#e74c3c', shape:'circle', label:'Site fora — sem TSK' },
+      { cor:'#3498db', shape:'circle', label:'Site fora — com TSK' },
+      { cor:'#f0b429', shape:'circle', label:'Site fora — recente (<1h)' },
+      { cor:'#888',    shape:'circle', label:'FLAG 0 (demais sites)' },
+      { cor:'#800080', shape:'line', label:'MW Nokia' },
+      { cor:'#d20014', shape:'line', label:'MW Huawei' },
+      { cor:'#dcf014', shape:'line', label:'MW Ceragon' },
+      { cor:'#000078', shape:'line', label:'MW Ericsson' },
+      { cor:'#14c8f0', shape:'line', label:'MW SIAE' },
+      { cor:'#2ecc71', shape:'square', label:'Hub FO' },
+      { cor:'#aaa', shape:'thickline', label:'Linha grossa = enlace de site fora', noClick:true },
+    ];
+    var legEl = U.h('div', { style: { display:'flex', gap:'12px', flexWrap:'wrap', marginTop:'8px', fontSize:'11px', color:'var(--tne-muted)' } },
+      legItems.map(function(item) {
+        var ico;
+        if (item.shape === 'thickline') {
+          ico = U.h('span', { style: { width:'24px', height:'5px', background:item.cor, display:'inline-block', verticalAlign:'middle', borderRadius:'2px' } });
+        } else if (item.shape === 'line') {
+          ico = U.h('span', { style: { width:'24px', height:'3px', background:item.cor, display:'inline-block', verticalAlign:'middle' } });
+        } else if (item.shape === 'square') {
+          ico = U.h('span', { style: { width:'10px', height:'10px', background:item.cor, display:'inline-block', borderRadius:'2px', border:'1px solid #fff' } });
+        } else {
+          ico = U.h('span', { style: { width:'10px', height:'10px', borderRadius:'50%', background:item.cor, display:'inline-block', border:'1px solid rgba(255,255,255,.4)' } });
+        }
+        return U.h('div', { style: { display:'flex', alignItems:'center', gap:'5px', opacity: item.noClick ? '0.7' : '1' } }, [ico, U.h('span',{text:item.label})]);
+      }));
+    // Associar cliques nas legendas — por item, com estado visual
+    container.appendChild(legEl);
+
+    if (!readOnly) {
+      semCoordPanelEl = U.h('div', {
+        style: { marginTop:'8px', background:'var(--tne-card)', border:'1px solid var(--tne-border)',
+                 borderRadius:'8px', overflow:'hidden', display:'none' }
+      });
+      container.appendChild(semCoordPanelEl);
+    }
+    var MW_VENDOR_BY_LEG_IDX = { 4:'NOKIA', 5:'HUAWEI', 6:'CERAGON', 7:'ERICSSON', 8:'SIAE' };
+    Array.prototype.forEach.call(legEl.children, function(el, idx) {
+      var item = legItems[idx];
+      if (!item || item.noClick) { return; }
+      _legEls[idx] = el;
+      el.style.cursor = 'pointer';
+      el.style.userSelect = 'none';
+      el.style.padding = '3px 7px';
+      el.style.borderRadius = '6px';
+      el.style.transition = 'all .15s';
+      el.title = 'Clique para mostrar/ocultar';
+
+      function setActive(on) {
+        if (on) {
+          el.style.opacity = '1'; el.style.background = ''; el.style.outline = '1.5px solid transparent'; el.style.textDecoration = '';
+        } else {
+          el.style.opacity = '0.3'; el.style.background = ''; el.style.outline = '1.5px solid transparent'; el.style.textDecoration = 'line-through';
+        }
+      }
+      setActive(true);
+
+      el.addEventListener('click', function() {
+        if (idx === 0) {
+          _filtros.legSemTSK = !_filtros.legSemTSK; setActive(_filtros.legSemTSK); applyMarkerFilter();
+        } else if (idx === 1) {
+          _filtros.legComTSK = !_filtros.legComTSK; setActive(_filtros.legComTSK); applyMarkerFilter();
+        } else if (idx === 2) {
+          _filtros.legRecente = !_filtros.legRecente; setActive(_filtros.legRecente); applyMarkerFilter();
+        } else if (idx === 3) {
+          ckFlag0.chk.checked = !ckFlag0.chk.checked; setActive(ckFlag0.chk.checked); ckFlag0.chk.dispatchEvent(new Event('change'));
+        } else if (MW_VENDOR_BY_LEG_IDX[idx]) {
+          var forn = MW_VENDOR_BY_LEG_IDX[idx];
+          _mwVendorVis[forn] = !_mwVendorVis[forn]; setActive(_mwVendorVis[forn]); applyMarkerFilter();
+        } else if (idx === 9) {
+          ckFO.chk.checked = !ckFO.chk.checked; setActive(ckFO.chk.checked); ckFO.chk.dispatchEvent(new Event('change'));
+        }
+      });
+    });
+
+    // ── Inicializar Leaflet ───────────────────────────────────
+    function getLeaflet(cb) {
+      if (window.L) { cb(); return; }
+      var css = document.createElement('link');
+      css.rel = 'stylesheet'; css.href = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';
+      document.head.appendChild(css);
+      var js = document.createElement('script');
+      js.src = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
+      js.onload = cb; document.head.appendChild(js);
+    }
+
+    function initMap() {
+      if (mapInstance) return;
+      var initCenter = ctx.prevCenter || [-8.0, -38.0];
+      var initZoom   = (ctx.prevZoom  != null) ? ctx.prevZoom : 6;
+      mapInstance = window.L.map('tne-mapa-leaflet', { preferCanvas: true, zoomControl: true })
+        .setView(initCenter, initZoom);
+      if (readOnly) TNE._publicMapInstance = mapInstance; // permite salvar estado no refresh silencioso
+
+      window.L.tileLayer('https://server.arcgisonline.com/arcgis/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+        attribution: '&copy; <a href="https://www.esri.com/">Esri</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        maxZoom: 16
+      }).addTo(mapInstance);
+
+      // Garante re-render correto ao exibir em aba SPA (container pode estar oculto no primeiro render)
+      setTimeout(function() { mapInstance.invalidateSize(); }, 250);
+
+      layers.flag1 = window.L.layerGroup().addTo(mapInstance);
+      layers.flag0 = window.L.layerGroup();
+      layers.mw    = window.L.layerGroup().addTo(mapInstance);      // mantido por compatibilidade (não usado diretamente)
+      layers.mwFlag1 = window.L.layerGroup().addTo(mapInstance);    // enlaces conectados a sites FORA (FLAG 1) — sempre visível
+      layers.mwFlag0 = window.L.layerGroup();                        // demais enlaces — só visível se FLAG 0 também estiver ativo
+      layers.fo    = window.L.layerGroup();
+
+      // Eventos de toggle
+      ckFlag0.chk.addEventListener('change', function() {
+        if (ckFlag0.chk.checked) {
+          layers.flag0.addTo(mapInstance);
+          if (ckMW.chk.checked) layers.mwFlag0.addTo(mapInstance);
+        } else {
+          layers.flag0.remove();
+          layers.mwFlag0.remove();
+        }
+      });
+      ckMW.chk.addEventListener('change', function() {
+        if (ckMW.chk.checked) {
+          layers.mwFlag1.addTo(mapInstance);
+          if (ckFlag0.chk.checked) layers.mwFlag0.addTo(mapInstance);
+        } else {
+          layers.mwFlag1.remove();
+          layers.mwFlag0.remove();
+        }
+      });
+      ckFO.chk.addEventListener('change',   function() { if(ckFO.chk.checked)    layers.fo.addTo(mapInstance);    else layers.fo.remove(); });
+
+      // Busca em tempo real — site/ENDID e cidade separados
+      var timer = null;
+      function _onSearchInput() { clearTimeout(timer); timer = setTimeout(applyMarkerFilter, 200); }
+      siteInput.addEventListener('input', _onSearchInput);
+      cityInput.addEventListener('input', _onSearchInput);
+      var _acTimer = null;
+      cityInput.addEventListener('input', function() {
+        clearTimeout(_acTimer);
+        var q = (cityInput.value || '').trim();
+        _acTimer = setTimeout(function() { _populateCityDL(q); }, 350);
+      });
+
+    }
+
+    // ── Calcular rota real via OSRM com polyline no mapa ────────────────
+    function calcularRota(pts, resultDiv) {
+      if (!mapInstance || pts.length < 2) return;
+      if (rotaLayer) { rotaLayer.remove(); rotaLayer = null; }
+      resultDiv.style.display = 'block';
+      resultDiv.innerHTML = '<span style="color:var(--tne-muted)">⏳ Calculando rota...</span>';
+
+      var waypoints = pts.map(function(p){ return p.lon+','+p.lat; }).join(';');
+      var url = 'https://router.project-osrm.org/route/v1/driving/'+waypoints+'?overview=full&geometries=geojson&steps=false';
+
+      fetch(url)
+        .then(function(r){ return r.json(); })
+        .then(function(data){
+          if (!data.routes || !data.routes.length) throw new Error('sem_rota');
+          var rota = data.routes[0];
+          var geom = rota.geometry.coordinates; // [[lon,lat],...]
+          var latlngs = geom.map(function(c){ return [c[1],c[0]]; });
+
+          rotaLayer = window.L.polyline(latlngs, { color:'#ff8c00', weight:5, opacity:0.88 }).addTo(mapInstance);
+          mapInstance.fitBounds(rotaLayer.getBounds().pad(0.15), { maxZoom:14 });
+
+          var legs = rota.legs || [];
+          var html = '<div style="border-radius:6px;overflow:hidden;border:1px solid var(--tne-border)">';
+          var totDist=0, totDur=0;
+          legs.forEach(function(leg,i){
+            var km=(leg.distance/1000).toFixed(1);
+            var t=fmtTempo(Math.round(leg.duration));
+            totDist+=leg.distance; totDur+=leg.duration;
+            html+='<div style="padding:5px 10px;border-bottom:1px solid var(--tne-border);display:flex;gap:10px;align-items:baseline">'
+              +'<b style="color:var(--tne-primary);white-space:nowrap">'+'ABCDEFGHIJKLMNOP'[i]+' → '+'ABCDEFGHIJKLMNOP'[i+1]+'</b>'
+              +'<span style="color:var(--tne-muted);font-size:11px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'
+              +pts[i].nome+' → '+pts[i+1].nome+'</span>'
+              +'<span style="color:#2ecc71;white-space:nowrap">🚗 '+km+' km</span>'
+              +' <span style="color:#3498db;white-space:nowrap">⏱ '+t+'</span>'
+              +'</div>';
+          });
+          if (legs.length>1) {
+            html+='<div style="padding:5px 10px;background:var(--tne-card2);display:flex;gap:14px;font-weight:700">'
+              +'<span>Total</span>'
+              +'<span style="color:#2ecc71">🚗 '+(totDist/1000).toFixed(1)+' km</span>'
+              +'<span style="color:#3498db">⏱ '+fmtTempo(Math.round(totDur))+'</span>'
+              +'</div>';
+          }
+          html+='</div>';
+          resultDiv.innerHTML = html;
+        })
+        .catch(function(){
+          // Fallback: linha reta com Haversine
+          var html='<div style="color:var(--tne-muted);font-size:11px;margin-bottom:4px">OSRM indisponível — distância em linha reta:</div>'
+            +'<div style="border-radius:6px;overflow:hidden;border:1px solid var(--tne-border)">';
+          var totKm=0;
+          var latlngs = pts.map(function(p){ return [p.lat,p.lon]; });
+          for (var i=0;i<pts.length-1;i++){
+            var km=haversineKm(pts[i].lat,pts[i].lon,pts[i+1].lat,pts[i+1].lon);
+            totKm+=km;
+            html+='<div style="padding:5px 10px;border-bottom:1px solid var(--tne-border);display:flex;gap:10px">'
+              +'<b style="color:var(--tne-primary)">'+'ABCDEFGH'[i]+' → '+'ABCDEFGH'[i+1]+'</b>'
+              +'<span style="color:var(--tne-muted);flex:1">'+pts[i].nome+' → '+pts[i+1].nome+'</span>'
+              +'<span style="color:var(--tne-primary)">~'+km.toFixed(1)+' km (reta)</span>'
+              +'</div>';
+          }
+          if (pts.length>2) html+='<div style="padding:5px 10px;font-weight:700">Total reta: ~'+totKm.toFixed(1)+' km</div>';
+          html+='</div>';
+          resultDiv.innerHTML=html;
+          rotaLayer=window.L.polyline(latlngs,{color:'#ff8c00',weight:3,dashArray:'6,4',opacity:0.8}).addTo(mapInstance);
+          mapInstance.fitBounds(rotaLayer.getBounds().pad(0.15),{maxZoom:14});
+        });
+    }
+
+    // ── Autocomplete de cidades ───────────────────────────────────────────
+    function _populateCityDL(q) {
+      var cities = {};
+      var ql = (q || '').toLowerCase();
+      Object.values(layers.flag1 && layers.flag1._layers || {}).forEach(function(m) {
+        var c = m._d && m._d.cidade ? m._d.cidade.trim() : '';
+        if (c.length > 2 && (!ql || c.toLowerCase().indexOf(ql) >= 0)) cities[c.toLowerCase()] = c;
+      });
+      function _fill() {
+        _cityDL.innerHTML = '';
+        Object.keys(cities).sort().forEach(function(k) {
+          var opt = document.createElement('option'); opt.value = cities[k]; _cityDL.appendChild(opt);
+        });
+      }
+      _fill();
+      if (!q || q.length < 3) return;
+      fetch('https://nominatim.openstreetmap.org/search?format=json&limit=7&countrycodes=br&addressdetails=1&q=' + encodeURIComponent(q), {
+        headers: { 'Accept-Language':'pt-BR,pt', 'User-Agent':'ControleTMG/1.0' }
+      }).then(function(r){ return r.json(); }).then(function(data) {
+        if (!data || !cityInput.value.trim()) return;
+        (data || []).forEach(function(item) {
+          var addr = item.address || {};
+          var name = addr.city || addr.town || addr.municipality || addr.village || addr.suburb || item.name || '';
+          if (name && name.length > 2) cities[name.toLowerCase()] = name;
+        });
+        _fill();
+      }).catch(function(){});
+    }
+
+    // ── Limite de município via Nominatim ─────────────────────────────────
+    function _buscarLimite(qCity, cb) {
+      var key = qCity.toLowerCase().trim();
+      if (_boundaryCache[key] !== undefined) { cb(_boundaryCache[key]); return; }
+      var url = 'https://nominatim.openstreetmap.org/search?format=json&polygon_geojson=1&limit=1&countrycodes=br&q='
+        + encodeURIComponent(qCity + ' Brasil');
+      fetch(url, { headers: { 'Accept-Language':'pt-BR,pt', 'User-Agent':'ControleTMG/1.0' } })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          var res = (data && data[0]) ? { geojson: data[0].geojson || null, lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) } : null;
+          _boundaryCache[key] = res;
+          cb(res);
+        })
+        .catch(function() { _boundaryCache[key] = null; cb(null); });
+    }
+
+    function _atualizarDestaqueCidade(qCity, matched) {
+      if (_boundaryLayer) { _boundaryLayer.remove(); _boundaryLayer = null; }
+      if (_cityCircle) { _cityCircle.remove(); _cityCircle = null; }
+      if (!qCity || !mapInstance) return;
+      if (matched.length > 0) {
+        var pts = matched.filter(function(m){ return m.getLatLng; }).map(function(m){ return m.getLatLng(); });
+        if (pts.length > 0) mapInstance.fitBounds(window.L.latLngBounds(pts).pad(0.35), { maxZoom: 13 });
+      }
+      _buscarLimite(qCity, function(res) {
+        if (!res || (cityInput.value || '').trim().toLowerCase() !== qCity) return;
+        if (res.geojson) {
+          _boundaryLayer = window.L.geoJSON(res.geojson, {
+            style: { color:'#ff8c00', weight:2.5, dashArray:'9,6', fillOpacity:0.04, fillColor:'#ff8c00', lineCap:'round', lineJoin:'round' }
+          }).addTo(mapInstance);
+          if (matched.length === 0) mapInstance.fitBounds(_boundaryLayer.getBounds().pad(0.1), { maxZoom: 13 });
+        } else if (res.lat && res.lon) {
+          mapInstance.flyTo([res.lat, res.lon], 12, { duration: 0.8 });
+          _cityCircle = window.L.circle([res.lat, res.lon], { radius:8000, color:'#ff8c00', fillColor:'#ff8c00', fillOpacity:0.04, weight:2, dashArray:'8,7' }).addTo(mapInstance);
+        }
+      });
+    }
+
+    // ── Relatório de rota ─────────────────────────────────────────────────
+    function _nnSort(sites) {
+      if (sites.length <= 1) return sites.slice();
+      var rem = sites.filter(function(s){ return s.lat && s.lon; });
+      if (!rem.length) return sites.slice();
+      var sorted = [rem.splice(0, 1)[0]];
+      while (rem.length) {
+        var last = sorted[sorted.length - 1];
+        var minD = Infinity, minI = 0;
+        rem.forEach(function(s, i) { var d = haversineKm(last.lat, last.lon, s.lat, s.lon); if (d < minD) { minD = d; minI = i; } });
+        sorted.push(rem.splice(minI, 1)[0]);
+      }
+      return sorted;
+    }
+
+    function gerarRelatorio() {
+      if (!layers.flag1) { U.toast && U.toast('Mapa não carregado', 'warn'); return; }
+      var marcadores = Object.values(layers.flag1._layers || {}).filter(function(m) { return m.getOpacity ? m.getOpacity() > 0.5 : true; });
+      if (!marcadores.length) { U.toast && U.toast('Nenhum site visível para gerar relatório', 'warn'); return; }
+
+      // Deduplicar por END_ID (preferir SR- > 5G- > outros)
+      var _rp = function(n) { return (n||'').indexOf('SR-')===0 ? 2 : (n||'').indexOf('5G-')===0 ? 1 : 0; };
+      var _dedupMap = {};
+      marcadores.forEach(function(m) {
+        var d = m._d || {};
+        var eid = d.eid || '';
+        if (!eid) return;
+        if (!_dedupMap[eid]) { _dedupMap[eid] = d; return; }
+        if (_rp(d.site) > _rp(_dedupMap[eid].site)) _dedupMap[eid] = d;
+      });
+      var sitesDedup = Object.values(_dedupMap);
+
+      var porRegiao = {};
+      sitesDedup.forEach(function(d) {
+        var r = d.regiao || 'OTHERS';
+        if (!porRegiao[r]) porRegiao[r] = [];
+        porRegiao[r].push(d);
+      });
+      var regioesList = _filtros.regiao ? [_filtros.regiao] : Object.keys(porRegiao).sort();
+
+      var sitesComCoord = sitesDedup.filter(function(d) { return d.lat && d.lon; });
+
+      if (btnRelatorio) { btnRelatorio.textContent = '⏳ Calculando...'; btnRelatorio.disabled = true; }
+      function _resetBtn() {
+        if (btnRelatorio) { btnRelatorio.textContent = '📋 Copiar relatório'; btnRelatorio.disabled = false; }
+      }
+
+      function _emitir(distMatrix, durMatrix) {
+        var _idxMap = {};
+        sitesComCoord.forEach(function(s, i) { if (s.eid) _idxMap[s.eid] = i; });
+
+        function _distEntre(a, b) {
+          if (distMatrix && a.eid && b.eid) {
+            var ia = _idxMap[a.eid], ib = _idxMap[b.eid];
+            if (ia !== undefined && ib !== undefined && distMatrix[ia] && distMatrix[ia][ib] != null)
+              return distMatrix[ia][ib]; // metros
+          }
+          return haversineKm(a.lat, a.lon, b.lat, b.lon) * 1000;
+        }
+
+        function _durEntre(a, b) {
+          if (!durMatrix || !a.eid || !b.eid) return null;
+          var ia = _idxMap[a.eid], ib = _idxMap[b.eid];
+          if (ia !== undefined && ib !== undefined && durMatrix[ia] && durMatrix[ia][ib] != null)
+            return durMatrix[ia][ib]; // segundos
+          return null;
+        }
+
+        function _nnSortM(sites) {
+          if (sites.length <= 1) return sites.slice();
+          var rem = sites.filter(function(s){ return s.lat && s.lon; });
+          if (!rem.length) return sites.slice();
+          var sorted = [rem.splice(0, 1)[0]];
+          while (rem.length) {
+            var last = sorted[sorted.length - 1];
+            var minD = Infinity, minI = 0;
+            rem.forEach(function(s, i) {
+              var d = _distEntre(last, s);
+              if (d < minD) { minD = d; minI = i; }
+            });
+            sorted.push(rem.splice(minI, 1)[0]);
+          }
+          return sorted;
+        }
+
+        var usouOSRM = !!distMatrix;
+        var linhas = ['🗺️ SITES FORA — ' + new Date().toLocaleString('pt-BR')];
+        if (usouOSRM) linhas.push('📍 Distâncias por estrada via OSRM (sem tráfego em tempo real)');
+        linhas.push('');
+
+        regioesList.forEach(function(r) {
+          var sites = porRegiao[r];
+          if (!sites || !sites.length) return;
+          var label = (C && C.REGIAO_LABELS && C.REGIAO_LABELS[r]) || r;
+          linhas.push('━━━ ' + label + ' (' + sites.length + ') ━━━');
+          var sorted = _nnSortM(sites);
+          var semCoord = sites.filter(function(s){ return !s.lat || !s.lon; });
+          sorted.forEach(function(s, i) {
+            var info = (i + 1) + '. ' + (s.site || s.eid);
+            if (s.eid && s.eid !== s.site) info += ' (' + s.eid + ')';
+            if (s.cidade) info += ' — ' + s.cidade;
+            info += s.tsk ? '  🔵 COM TSK' : '  🔴 SEM TSK';
+            linhas.push(info);
+            if (i < sorted.length - 1 && sorted[i+1] && sorted[i+1].lat && s.lat) {
+              var distM = _distEntre(s, sorted[i+1]);
+              var distKm = distM / 1000;
+              var trecho = '   ↓ ~' + distKm.toFixed(1) + ' km';
+              if (usouOSRM) {
+                var dur = _durEntre(s, sorted[i+1]);
+                if (dur != null) {
+                  var _m = Math.round(dur / 60);
+                  var _t = _m < 60 ? _m + 'min' : (Math.floor(_m/60) + 'h' + (_m%60 ? (_m%60) + 'min' : ''));
+                  trecho += ' · ~' + _t;
+                }
+                trecho += ' (por estrada)';
+              }
+              if (distKm > 80) trecho += '  ⚠️ longa distância';
+              linhas.push(trecho);
+            }
+          });
+          if (semCoord.length) linhas.push('   (sem coord: ' + semCoord.map(function(s){ return s.site||s.eid; }).join(', ') + ')');
+          linhas.push('');
+        });
+
+        var texto = linhas.join('\n');
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(texto).then(function() { U.toast && U.toast('Relatório copiado!', 'ok'); }).catch(function() { _fallbackCopy(texto); });
+        } else { _fallbackCopy(texto); }
+        _resetBtn();
+      }
+
+      if (sitesComCoord.length >= 2) {
+        var coords = sitesComCoord.map(function(s) { return s.lon + ',' + s.lat; }).join(';');
+        fetch('https://router.project-osrm.org/table/v1/driving/' + coords + '?annotations=distance,duration')
+          .then(function(r) { return r.json(); })
+          .then(function(data) { _emitir(data.distances || null, data.durations || null); })
+          .catch(function() { _emitir(null, null); });
+      } else {
+        _emitir(null, null);
+      }
+    }
+
+    function _fallbackCopy(txt) {
+      var ta = document.createElement('textarea');
+      ta.value = txt; ta.style.cssText = 'position:fixed;left:-9999px';
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); U.toast && U.toast('Relatório copiado!', 'ok'); } catch(e) { U.toast && U.toast('Não foi possível copiar', 'err'); }
+      document.body.removeChild(ta);
+    }
+
+    function applyMarkerFilter() {
+      if (!layers.flag1) return;
+      var q      = (siteInput.value || '').trim().toLowerCase();
+      var qCity  = (cityInput.value || '').trim().toLowerCase();
+      var matched = [];
+      // cidade não filtra marcadores — apenas zoom + contorno municipal (ver _atualizarDestaqueCidade)
+      var anyFilter = q || _filtros.regiao || _filtros.soTSK || !_filtros.legSemTSK || !_filtros.legComTSK || !_filtros.legRecente;
+
+      Object.values(layers.flag1._layers || {}).forEach(function(m) {
+        var d = m._d || {};
+        var okSite   = !q || (d.eid||'').toLowerCase().indexOf(q)>=0 || (d.site||'').toLowerCase().indexOf(q)>=0;
+        var okRegiao = !_filtros.regiao || (d.regiao||'OTHERS') === _filtros.regiao;
+        var okTipo = true;
+        if (d.cor === '#e74c3c' && !_filtros.legSemTSK) okTipo = false;
+        if (d.cor === '#3498db' && !_filtros.legComTSK) okTipo = false;
+        if (d.cor === '#f0b429' && !_filtros.legRecente) okTipo = false;
+        if (_filtros.soTSK && !d.tsk) okTipo = false;
+        var visible = okSite && okRegiao && okTipo;
+        m.setOpacity(visible ? 1 : 0);
+        if (visible) matched.push(m);
+      });
+
+      Object.values(layers.fo && layers.fo._layers ? layers.fo._layers : {}).forEach(function(m) {
+        var d = m._d || {};
+        var ok = !q || (d.eid||'').toLowerCase().indexOf(q)>=0 || (d.nome||'').toLowerCase().indexOf(q)>=0;
+        if (m.setOpacity) m.setOpacity(ok ? 1 : 0);
+        else if (m.setStyle) m.setStyle({ fillOpacity: ok ? 0.85 : 0, opacity: ok ? 1 : 0 });
+        if (ok && mapInstance && mapInstance.hasLayer(layers.fo)) matched.push(m);
+      });
+
+      [layers.mwFlag1, layers.mwFlag0].forEach(function(layer) {
+        if (!layer) return;
+        Object.values(layer._layers || {}).forEach(function(line) {
+          var forn = (line._forn || '').toUpperCase();
+          var vis = (_mwVendorVis[forn] !== false);
+          if (line.setStyle) line.setStyle({ opacity: vis ? (line.options._baseOpacity || 0.7) : 0.04 });
+        });
+      });
+
+      // Usa lista própria por texto para orientar o zoom; opacidade dos marcadores NÃO é alterada por cidade
+      if (qCity) {
+        var _cityMatched = Object.values(layers.flag1._layers || {}).filter(function(m) {
+          var d = m._d || {};
+          return m.getLatLng && (d.cidade||'').toLowerCase().indexOf(qCity) >= 0;
+        });
+        _atualizarDestaqueCidade(qCity, _cityMatched);
+      } else {
+        if (_boundaryLayer) { _boundaryLayer.remove(); _boundaryLayer = null; }
+        if (_cityCircle) { _cityCircle.remove(); _cityCircle = null; }
+      }
+
+      if (!qCity && q && matched.length > 0 && matched.length <= 30 && mapInstance) {
+        var pts2 = matched.filter(function(m){ return m.getLatLng; }).map(function(m){ return m.getLatLng(); });
+        if (pts2.length > 0) mapInstance.fitBounds(window.L.latLngBounds(pts2).pad(0.3), { maxZoom: 14 });
+      }
+
+      if (!q && !qCity && _filtros.regiao && matched.length > 0 && mapInstance) {
+        var pts3 = matched.filter(function(m){ return m.getLatLng; }).map(function(m){ return m.getLatLng(); });
+        if (pts3.length > 0) mapInstance.fitBounds(window.L.latLngBounds(pts3).pad(0.25), { maxZoom: 12 });
+      }
+
+      if (!anyFilter) {
+        Object.values(layers.flag1._layers || {}).forEach(function(m){ m.setOpacity(1); });
+        Object.values((layers.fo && layers.fo._layers) || {}).forEach(function(m){
+          if (m.setOpacity) m.setOpacity(1);
+          else if (m.setStyle) m.setStyle({ fillOpacity:0.85, opacity:1 });
+        });
+      }
+    }
+    function filtrarMarcadores(q) { applyMarkerFilter(); } // alias de compatibilidade
+
+    // ── Ícone DIV customizado ─────────────────────────────────
+    function divIcon(cor, sz, shape) {
+      sz = sz || 14;
+      var html;
+      if (shape === 'square') {
+        html = '<div style="width:' + sz + 'px;height:' + sz + 'px;background:' + cor + ';border:2px solid #fff;border-radius:3px;box-shadow:0 0 4px rgba(0,0,0,.5)"></div>';
+      } else {
+        html = '<div style="width:' + sz + 'px;height:' + sz + 'px;background:' + cor + ';border:2px solid #fff;border-radius:50%;box-shadow:0 0 6px ' + cor + '88"></div>';
+      }
+      return window.L.divIcon({ html:html, className:'', iconSize:[sz,sz], iconAnchor:[sz/2,sz/2], popupAnchor:[0,-sz/2] });
+    }
+
+    // ── Renderizar sites (markerData vindos da ponte ou do coordMap) ──
+    function renderSites(sitesList) {
+      if (!mapInstance) return;
+      layers.flag1.clearLayers();
+      layers.flag0.clearLayers();
+
+      var cTSK = 0, cSemCoord = 0;
+      var tasksAtivas = tasks.filter(function(t){
+        var s=(t.status||'').toUpperCase().trim(); return s==='NÃO INICIADO'||s==='NAO INICIADO'||s==='INICIADO';
+      });
+
+      function _getFlag(s) {
+        var f = (s.flag !== undefined) ? s.flag : ((s.FLAG !== undefined) ? s.FLAG : 1);
+        return String(f);
+      }
+      sitesFlag1 = sitesList.filter(function(s){ return _getFlag(s) === '1'; });
+      sitesFlag0Raw = sitesList.filter(function(s){ return _getFlag(s) === '0'; });
+
+      sitesFlag1.forEach(function(site) {
+        var lat = parseCoord(site.Latitude || site.latitude || site.lat || '');
+        var lon = parseCoord(site.Longitude || site.longitude || site.lon || '');
+        if (isNaN(lat) || isNaN(lon)) { cSemCoord++; return; }
+
+        var eid    = (site.ENDID || site.endId || '').trim();
+        var nome   = site.NEName || site.nome || siteByEndId[eid] || eid;
+        var cidade = site.municipio || site.cidade || '';
+
+        // Verificar TSK aberta
+        var incMatch = incidents.filter(function(i){ return i.enderecoId === eid; })[0];
+        var tsk = (incMatch && U.tskAberta) ? U.tskAberta(incMatch, tasksAtivas) : null;
+        if (tsk) cTSK++;
+
+        // Cor baseada no tempo (como o original)
+        var tempo = parseInt(site.tempo || '99', 10);
+        var cor = tsk ? '#3498db' : (tempo === 0 ? '#f0b429' : '#e74c3c');
+
+        var marker = window.L.marker([lat, lon], { icon: divIcon(cor, 14) });
+        marker._d = { eid:eid, site:nome, cidade:cidade, lat:lat, lon:lon, tsk:!!tsk, cor:cor, regiao:(incMatch && incMatch.regiao)||'OTHERS' };
+
+        // Monta endereço TSK se disponível
+        var tskEnd = tsk ? ((tsk.enderecoLogradouro||'') + (tsk.bairro ? ', '+tsk.bairro : '') + (tsk.cidade ? ' - '+tsk.cidade : '')) : '';
+        tskEnd = tskEnd.trim().replace(/^[,\s-]+|[,\s-]+$/g,'');
+
+        var popId = 'pop_' + eid.replace(/\W/g,'_');
+        var popContent = '<div id="' + popId + '" style="font:12px ui-monospace,monospace;min-width:210px">'
+          + '<b style="color:' + cor + ';font-size:13px">' + nome + '</b><br>'
+          + '<span style="color:#888">END_ID:</span> ' + eid + '<br>'
+          + (cidade ? '<span style="color:#888">Cidade:</span> ' + cidade + '<br>' : '')
+          + '<span style="color:#888">Queda:</span> ' + (site.queda||'—') + '<br>'
+          + (site.evento ? '<span style="color:#888">Evento:</span> ' + site.evento + '<br>' : '')
+          + (site.previsao ? '<span style="color:#888">Previsão:</span> ' + site.previsao + '<br>' : '')
+          + (site.celulas ? '<span style="color:#888">Células:</span> ' + site.celulas + '<br>' : '')
+          + (tsk
+              ? '<b style="color:#3498db">TSK: ' + tsk.osNumero + '</b>'
+                + (tskEnd ? '<br><span style="color:#888">📍 Endereço TSK:</span> ' + tskEnd
+                   + '<br><button onclick="(function(){' +
+                     'var el=document.getElementById(\'' + popId + '\');' +
+                     'var btn=el.querySelector(\'.geo-btn\');btn.textContent=\'Geocodificando...\';btn.disabled=true;' +
+                     'TNE._geocodTSK(\'' + eid + '\',' + lat + ',' + lon + ',\'' + encodeURIComponent(tsk.enderecoLogradouro||'') + '\',\'' + encodeURIComponent(tsk.cidade||'') + '\',\'' + encodeURIComponent(tsk.bairro||'') + '\', el);' +
+                   '})()" class="geo-btn" style="margin-top:4px;font-size:10px;padding:2px 7px;background:rgba(52,152,219,.15);color:#3498db;border:1px solid #3498db;border-radius:4px;cursor:pointer">📍 Ver endereço no mapa</button>'
+                   : '')
+              : '<span style="color:#e74c3c">Sem TSK aberta</span>')
+          + '</div>';
+        marker.bindPopup(popContent, { maxWidth: 300 });
+        marker.bindTooltip(nome + ' (' + eid + ')', { direction:'top' });
+        marker.addTo(layers.flag1);
+      });
+
+      // FLAG 0
+      sitesFlag0Raw.forEach(function(site) {
+        var lat = parseCoord(site.Latitude||site.latitude||site.lat||'');
+        var lon = parseCoord(site.Longitude||site.longitude||site.lon||'');
+        if (isNaN(lat) || isNaN(lon)) return;
+        var eid  = (site.ENDID||site.endId||'').trim();
+        var nome = site.NEName || site.nome || siteByEndId[eid] || eid;
+        var m = window.L.circleMarker([lat,lon], { radius:4, color:'#555', fillColor:'#777', fillOpacity:0.5, weight:1 });
+        m._d = { eid:eid, site:nome, cidade:site.municipio||'' };
+        m.bindTooltip(nome + ' (' + eid + ')', { direction:'top' });
+        m.addTo(layers.flag0);
+      });
+
+      updateStats(sitesFlag1.length, cTSK, cSemCoord);
+      _populateCityDL('');
+      calcSemCoordList();
+    }
+
+    // ── Renderizar MW + FO (static, from stored data) ──────────
+    // Retorna o conjunto de END_IDs atualmente em FLAG 1 (incidentes ativos)
+    function getEidsAtivos() {
+      var eidsAtivos = {};
+      incidents.forEach(function(i) {
+        if ((i.statusTrat||'').toUpperCase() === 'RESOLVIDO') return;
+        var eid = (i.enderecoId||'').trim();
+        if (eid) eidsAtivos[eid] = true;
+      });
+      // Também considera os sites vindos da ponte, se disponíveis
+      sitesFlag1.forEach(function(s) {
+        var eid = (s.ENDID||s.endId||'').trim();
+        if (eid) eidsAtivos[eid] = true;
+      });
+      return eidsAtivos;
+    }
+
+    function calcSemCoordList() {
+      var seen = {};
+      var incAtivos = incidents.filter(function(i){ return (i.statusTrat||'').toUpperCase() !== 'RESOLVIDO'; });
+      semCoordList = [];
+      comCoordList = [];
+      incAtivos.forEach(function(inc) {
+        var eid = (inc.enderecoId||'').trim();
+        if (!eid || seen[eid]) return;
+        seen[eid] = true;
+        var c = coordMap[eid] || (inc._lat && inc._lon ? [parseFloat(inc._lat), parseFloat(inc._lon)] : null);
+        var item = { eid: eid, site: inc.site||'', cidade: (inc.cidadeUf||'').split('/')[0].trim() };
+        if (c) {
+          item.coordStr = parseFloat(c[0]).toFixed(6) + ', ' + parseFloat(c[1]).toFixed(6);
+          comCoordList.push(item);
+        } else {
+          semCoordList.push(item);
+        }
+      });
+      updateSemCoordPanel();
+    }
+
+    function updateSemCoordPanel() {
+      if (!semCoordPanelEl) return;
+      if (!semCoordList.length && !comCoordList.length) { semCoordPanelEl.style.display = 'none'; return; }
+      semCoordPanelEl.style.display = '';
+      semCoordPanelEl.innerHTML = '';
+      if (semCoordList.length) appendCoordSection(semCoordPanelEl, semCoordList, false);
+      if (comCoordList.length) appendCoordSection(semCoordPanelEl, comCoordList, true);
+    }
+
+    function appendCoordSection(container, items, hasCoords) {
+      var NS = 'tne'; // prefixo CSS
+      var expanded = false;
+      var label = hasCoords
+        ? '📍 ' + items.length + ' site(s) com coordenada'
+        : '⚠ ' + items.length + ' site(s) sem coordenada';
+      var color = hasCoords ? 'var(--tne-muted)' : '#e67e22';
+      var sep = container.children.length > 0;
+      var toggleBtn = U.h('span', { style:{ marginLeft:'auto', fontSize:'12px', cursor:'pointer', color:'var(--tne-muted)' }, text: '▸' });
+      var header = U.h('div', {
+        style:{ display:'flex', alignItems:'center', gap:'8px', padding:'8px 14px', cursor:'pointer',
+                borderBottom:'1px solid transparent',
+                borderTop: sep ? '1px solid var(--tne-border)' : 'none' }
+      }, [
+        U.h('span', { style:{ fontSize:'12px', fontWeight:'600', color: color }, text: label }),
+        toggleBtn
+      ]);
+      var colsHdr = hasCoords
+        ? ['END_id','Site','Cidade','Coordenada','']
+        : ['END_id','Site','Cidade','Latitude','Longitude',''];
+      var tbody = U.h('div', { style:{ display:'none', overflowX:'auto', maxHeight:'320px', overflowY:'auto' } });
+      var tbl = document.createElement('table');
+      tbl.style.cssText = 'width:100%;border-collapse:collapse;font-size:12px;';
+      var hrow = tbl.createTHead().insertRow();
+      colsHdr.forEach(function(h) {
+        var th = document.createElement('th');
+        th.textContent = h;
+        th.style.cssText = 'text-align:left;padding:5px 10px;color:var(--tne-muted);font-weight:600;position:sticky;top:0;background:var(--tne-card);border-bottom:1px solid var(--tne-border);';
+        hrow.appendChild(th);
+      });
+      var tbodyEl = tbl.createTBody();
+
+      items.forEach(function(item) {
+        var tr = tbodyEl.insertRow();
+        tr.style.borderBottom = '1px solid var(--tne-border)';
+        [item.eid, item.site||'—', item.cidade||'—'].forEach(function(txt) {
+          var td = tr.insertCell(); td.style.padding = '5px 10px'; td.style.color = 'var(--tne-muted)';
+          td.textContent = txt;
+        });
+        if (hasCoords) {
+          var coordParts = (item.coordStr||'').split(',');
+          var latVal = (coordParts[0]||'').trim();
+          var lonVal = (coordParts[1]||'').trim();
+          var tdCoord = tr.insertCell(); tdCoord.style.padding = '5px 10px';
+          var tdAcao  = tr.insertCell(); tdAcao.style.padding = '4px 8px';
+          var coordDisplay = U.h('span', { style:{ color:'var(--tne-muted)', fontFamily:'monospace', fontSize:'11px' }, text: item.coordStr });
+          var latInp = U.h('input', { type:'text', value: latVal, style:{ width:'90px', background:'var(--tne-card2)', border:'1px solid var(--tne-border)', borderRadius:'4px', color:'var(--tne-fg)', padding:'3px 6px', fontSize:'12px', outline:'none', display:'none' } });
+          var lonInp = U.h('input', { type:'text', value: lonVal, style:{ width:'90px', background:'var(--tne-card2)', border:'1px solid var(--tne-border)', borderRadius:'4px', color:'var(--tne-fg)', padding:'3px 6px', fontSize:'12px', outline:'none', display:'none' } });
+          var editBtn   = U.h('button', { class:'tne-btn tne-btn-ghost clickable', style:{fontSize:'11px',padding:'3px 8px'}, text:'✏ editar' });
+          var saveBtn   = U.h('button', { class:'tne-btn tne-btn-primary clickable', style:{fontSize:'11px',padding:'3px 10px',display:'none'}, text:'💾' });
+          var cancelBtn = U.h('button', { class:'tne-btn tne-btn-ghost clickable', style:{fontSize:'11px',padding:'3px 8px',display:'none',marginLeft:'4px'}, text:'✖' });
+          tdCoord.appendChild(coordDisplay); tdCoord.appendChild(latInp); tdCoord.appendChild(lonInp);
+          tdAcao.appendChild(editBtn); tdAcao.appendChild(saveBtn); tdAcao.appendChild(cancelBtn);
+          editBtn.addEventListener('click', function() {
+            coordDisplay.style.display='none'; latInp.style.display=''; lonInp.style.display='';
+            editBtn.style.display='none'; saveBtn.style.display=''; cancelBtn.style.display='';
+          });
+          cancelBtn.addEventListener('click', function() {
+            latInp.value=latVal; lonInp.value=lonVal;
+            coordDisplay.style.display=''; latInp.style.display='none'; lonInp.style.display='none';
+            editBtn.style.display=''; saveBtn.style.display='none'; cancelBtn.style.display='none';
+          });
+          saveBtn.addEventListener('click', function() {
+            salvarCoordManual(item.eid, latInp.value, lonInp.value, function() {
+              var newCoord = parseFloat(latInp.value.replace(',','.')).toFixed(6) + ', ' + parseFloat(lonInp.value.replace(',','.')).toFixed(6);
+              item.coordStr = newCoord;
+              latVal = newCoord.split(',')[0].trim(); lonVal = newCoord.split(',')[1].trim();
+              coordDisplay.textContent = newCoord;
+              coordDisplay.style.display=''; latInp.style.display='none'; lonInp.style.display='none';
+              editBtn.style.display=''; saveBtn.style.display='none'; cancelBtn.style.display='none';
+            });
+          });
+        } else {
+          var latInp = U.h('input', { type:'text', placeholder:'-19.9173', style:{ width:'95px', background:'var(--tne-card2)', border:'1px solid var(--tne-border)', borderRadius:'4px', color:'var(--tne-fg)', padding:'3px 6px', fontSize:'12px', outline:'none' } });
+          var lonInp = U.h('input', { type:'text', placeholder:'-43.9346', style:{ width:'95px', background:'var(--tne-card2)', border:'1px solid var(--tne-border)', borderRadius:'4px', color:'var(--tne-fg)', padding:'3px 6px', fontSize:'12px', outline:'none' } });
+          var tdLat = tr.insertCell(); tdLat.style.padding = '4px 8px'; tdLat.appendChild(latInp);
+          var tdLon = tr.insertCell(); tdLon.style.padding = '4px 8px'; tdLon.appendChild(lonInp);
+          var btnSave = U.h('button', { class:'tne-btn tne-btn-primary clickable', style:{fontSize:'11px',padding:'3px 10px'}, text:'💾' });
+          btnSave.addEventListener('click', function() {
+            salvarCoordManual(item.eid, latInp.value, lonInp.value, function() {
+              tr.style.opacity='0.4'; btnSave.disabled=true; btnSave.textContent='✓';
+            });
+          });
+          var tdAcao = tr.insertCell(); tdAcao.style.padding = '4px 8px'; tdAcao.appendChild(btnSave);
+        }
+      });
+      tbody.appendChild(tbl);
+      header.addEventListener('click', function() {
+        expanded = !expanded;
+        tbody.style.display = expanded ? '' : 'none';
+        toggleBtn.textContent = expanded ? '▾' : '▸';
+        header.style.borderBottomColor = expanded ? 'var(--tne-border)' : 'transparent';
+      });
+      container.appendChild(header);
+      container.appendChild(tbody);
+    }
+
+    function salvarCoordManual(eid, latStr, lonStr, onDone) {
+      var lat = parseFloat(String(latStr).replace(',', '.'));
+      var lon = parseFloat(String(lonStr).replace(',', '.'));
+      if (isNaN(lat) || isNaN(lon) || !eid) { U.toast && U.toast('Latitude/longitude inválidas', 'err'); return; }
+      coordMap[eid] = [lat, lon];
+      saveLS(LS_COORDS, coordMap);
+      var coordStr = lat.toFixed(6) + ', ' + lon.toFixed(6);
+      if (TNE.api && TNE.api.saveMapaCoords) TNE.api.saveMapaCoords(coordMap).catch(function(){});
+      if (TNE.api && TNE.api.saveCoordVALID_CAD) TNE.api.saveCoordVALID_CAD([{ endId: eid, coord: coordStr }]).catch(function(){});
+      if (mapaMarkers.length) renderSites(mapaMarkers);
+      else renderComCoordMap();
+      renderEstaticos();
+      U.toast && U.toast('Coord salva: ' + eid, 'ok');
+      onDone && onDone();
+    }
+
+    function exportarCoordXlsx() {
+      function doExport(XLSX) {
+        var rows = [];
+        var seen = {};
+        (mapaMarkers.length ? mapaMarkers : []).forEach(function(m) {
+          var eid = (m.ENDID || m.endId || '').trim();
+          var lat = parseCoord(m.Latitude || m.lat);
+          var lon = parseCoord(m.Longitude || m.lon);
+          if (!eid || isNaN(lat) || !lat) return;
+          seen[eid] = true;
+          rows.push({ 'Cidade': m.municipio || m.cidade || '', 'END_id': eid, 'NEid': m.NEName || '', 'Coordenada': lat.toFixed(6) + ', ' + lon.toFixed(6) });
+        });
+        Object.keys(coordMap).forEach(function(eid) {
+          if (seen[eid]) return;
+          var c = coordMap[eid];
+          rows.push({ 'Cidade': '', 'END_id': eid, 'NEid': siteByEndId[eid] || '', 'Coordenada': c[0].toFixed(6) + ', ' + c[1].toFixed(6) });
+        });
+        if (!rows.length) { U.toast && U.toast('Nenhuma coordenada disponível', 'warn'); return; }
+        var wb = XLSX.utils.book_new();
+        var ws = XLSX.utils.json_to_sheet(rows, { header: ['Cidade','END_id','NEid','Coordenada'] });
+        ws['!cols'] = [{wch:20},{wch:18},{wch:18},{wch:22}];
+        XLSX.utils.book_append_sheet(wb, ws, 'Coordenadas');
+        XLSX.writeFile(wb, 'coordenadas_tmg.xlsx');
+      }
+      if (window.XLSX) { doExport(window.XLSX); return; }
+      var s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+      s.onload = function() { doExport(window.XLSX); };
+      document.head.appendChild(s);
+    }
+
+    function renderEstaticos() {
+      if (!mapInstance) return;
+      layers.mwFlag1.clearLayers();
+      layers.mwFlag0.clearLayers();
+      layers.fo.clearLayers();
+
+      var eidsAtivos = getEidsAtivos();
+
+      mwData.forEach(function(link) {
+        function pc(s){ try { return parseFloat(String(s).replace(/\u00a0/g,'').replace(',','.')); } catch(e){ return null; } }
+        var latA=pc(link.LAT_A), lonA=pc(link.LONG_A), latB=pc(link.LAT_B), lonB=pc(link.LONG_B);
+        if (!latA||!lonA||!latB||!lonB) return;
+        var forn  = (link.FORNECEDOR||'').toUpperCase();
+        var cor   = MW_CORES[forn] || MW_CORES.default;
+        var enlace = (link.Enlace&&link.Enlace.trim().length>5) ? link.Enlace : (link.Enlace2||'');
+
+        // Verifica se algum dos dois lados do enlace conecta a um site em FLAG 1
+        var parts = (link.Enlace2||'').split(' - ').map(function(p){ return p.trim(); });
+        var conectaFlag1 = parts.some(function(eid){ return eidsAtivos[eid]; });
+
+        var baseOp = conectaFlag1 ? 0.85 : 0.5;
+        var line = window.L.polyline([[latA,lonA],[latB,lonB]], {
+          color:cor, weight: conectaFlag1 ? 6 : 5, opacity: baseOp,
+          dashArray: forn==='CERAGON'?'6,4':null
+        });
+        line._forn = forn;
+        line.options._baseOpacity = baseOp;
+        line.bindPopup('<b>Enlace:</b> ' + enlace + '<br><b>Fornecedor:</b> ' + (link.FORNECEDOR||'—')
+          + (link.PROJETO ? '<br><b>Projeto:</b> ' + link.PROJETO : '')
+          + (conectaFlag1 ? '<br><span style="color:#e74c3c">⬤ Conectado a site fora</span>' : ''), { maxWidth:240 });
+
+        // Prioritário (conecta a FLAG 1) fica sempre na camada visível por padrão.
+        // Demais só aparecem quando FLAG 0 também estiver ativo.
+        if (conectaFlag1) line.addTo(layers.mwFlag1);
+        else line.addTo(layers.mwFlag0);
+      });
+
+      // Hub FO: vermelho se tem TSK aberta para o END_ID do hub
+      foData.forEach(function(hub) {
+        function pc(s){ try { return parseFloat(String(s).replace(/\u00a0/g,'').replace(',','.')); } catch(e){ return null; } }
+        var lat=pc(hub.LAT_A), lon=pc(hub.LONG_A);
+        if (!lat||!lon) return;
+        // Extrair ENDID do campo HUB — formato: "NEName (ENDID)"
+        var hubStr = hub.HUB || hub.NEName || '';
+        var mEid = hubStr.match(/\((\w+)\)/);
+        var eid  = mEid ? mEid[1] : (hub.NEName||'').trim();
+        // Verificar se há TSK aberta para este END_ID
+        var temTSK = eid && tasks.filter(function(t){
+          var s=(t.status||'').toUpperCase().trim();
+          return (s==='NÃO INICIADO'||s==='NAO INICIADO'||s==='INICIADO') &&
+                 (t.enderecoId||'').trim() === eid;
+        }).length > 0;
+        var corFO  = temTSK ? '#e74c3c' : '#2ecc71'; // vermelho se tem TSK, verde se não
+        var nomeFO = hub.NEName || hubStr;
+        var m = window.L.marker([lat,lon], { icon: divIcon(corFO, 10, 'square') });
+        m._d = { eid: eid, nome: nomeFO, cidade: '' };
+        var popupContent = '<b>' + hubStr + '</b><br>'
+          + (hub.FORNECEDOR||'') + (hub.PROJETO?' | '+hub.PROJETO:'')
+          + (temTSK ? '<br><span style="color:#e74c3c;font-weight:700">⚠ TSK aberta para END_ID: '+eid+'</span>' : '');
+        m.bindPopup(popupContent);
+        m.bindTooltip((temTSK ? '⚠ ' : '') + nomeFO + (eid?' ('+eid+')':''), { direction:'top' });
+        m.addTo(layers.fo);
+      });
+
+      // Ajustar visibilidade conforme estado atual dos checkboxes
+      if (!ckFlag0.chk.checked) layers.mwFlag0.remove();
+      else if (ckMW.chk.checked) layers.mwFlag0.addTo(mapInstance);
+    }
+
+
+    // ── Renderizar usando coordMap (fallback sem ponte) ────────
+    // FLAG 1 = apenas incidentes ativos (sites fora reais)
+    // FLAG 0 = todos os demais sites do coordMap (mostrado só se checkbox ativo)
+    function renderComCoordMap() {
+      if (!mapInstance) return;
+      layers.flag1.clearLayers();
+      layers.flag0.clearLayers();
+
+      var incAtivos = incidents.filter(function(i){
+        return (i.statusTrat||'').toUpperCase() !== 'RESOLVIDO';
+      });
+      var tasksAtivas = tasks.filter(function(t){
+        var s=(t.status||'').toUpperCase().trim();
+        return s==='NÃO INICIADO'||s==='NAO INICIADO'||s==='INICIADO';
+      });
+      var eidsAtivos = {};
+      incAtivos.forEach(function(i){ eidsAtivos[i.enderecoId||''] = i; });
+
+      var cTSK = 0, cSemCoord = 0;
+
+      // ── FLAG 1: só incidentes reais ──
+      incAtivos.forEach(function(inc) {
+        var eid = (inc.enderecoId||'').trim();
+        var coords = coordMap[eid] || (inc._lat && inc._lon ? [inc._lat, inc._lon] : null);
+        if (!coords) { cSemCoord++; return; }
+        var nome = inc.site || siteByEndId[eid] || eid;
+        var tsk = U.tskAberta ? U.tskAberta(inc, tasksAtivas) : null;
+        if (tsk) cTSK++;
+        var tempo = 99; // fallback; pode calcular a partir de inc.horario se necessário
+        var cor = tsk ? '#3498db' : '#e74c3c';
+        var marker = window.L.marker(coords, { icon: divIcon(cor, 14) });
+        var tskEnd2 = tsk ? ((tsk.enderecoLogradouro||'') + (tsk.bairro ? ', '+tsk.bairro : '') + (tsk.cidade ? ' - '+tsk.cidade : '')) : '';
+        tskEnd2 = tskEnd2.trim().replace(/^[,\s-]+|[,\s-]+$/g,'');
+        var popId2 = 'pop2_' + eid.replace(/\W/g,'_');
+        marker._d = { eid:eid, site:nome, cidade:(inc.cidadeUf||'').split('/')[0].trim(), lat:coords[0], lon:coords[1], tsk:!!tsk, cor:cor, regiao:inc.regiao||'OTHERS' };
+        var popContent = '<div id="' + popId2 + '" style="font:12px ui-monospace,monospace;min-width:210px">'
+          + '<b style="color:' + cor + ';font-size:13px">' + nome + '</b><br>'
+          + '<span style="color:#888">END_ID:</span> ' + eid + '<br>'
+          + ((inc.cidadeUf) ? '<span style="color:#888">Cidade:</span> ' + inc.cidadeUf + '<br>' : '')
+          + '<span style="color:#888">Queda:</span> ' + (inc.horario||'—') + '<br>'
+          + '<span style="color:#888">Duração:</span> ' + (inc.downtime||'—') + '<br>'
+          + '<span style="color:#888">Causa:</span> ' + (inc.causa||'/') + '<br>'
+          + (tsk
+              ? '<b style="color:#3498db">TSK: ' + tsk.osNumero + '</b>'
+                + (tskEnd2 ? '<br><span style="color:#888">📍 Endereço TSK:</span> ' + tskEnd2
+                   + '<br><button onclick="(function(){' +
+                     'var el=document.getElementById(\'' + popId2 + '\');' +
+                     'var btn=el.querySelector(\'.geo-btn\');btn.textContent=\'Geocodificando...\';btn.disabled=true;' +
+                     'TNE._geocodTSK(\'' + eid + '\',' + coords[0] + ',' + coords[1] + ',\'' + encodeURIComponent(tsk.enderecoLogradouro||'') + '\',\'' + encodeURIComponent(tsk.cidade||'') + '\',\'' + encodeURIComponent(tsk.bairro||'') + '\', el);' +
+                   '})()" class="geo-btn" style="margin-top:4px;font-size:10px;padding:2px 7px;background:rgba(52,152,219,.15);color:#3498db;border:1px solid #3498db;border-radius:4px;cursor:pointer">📍 Ver endereço no mapa</button>'
+                   : '')
+              : '<span style="color:#e74c3c">Sem TSK aberta</span>')
+          + '</div>';
+        marker.bindPopup(popContent, { maxWidth:300 });
+        marker.bindTooltip(nome + ' (' + eid + ')', { direction:'top' });
+        marker.addTo(layers.flag1);
+      });
+
+      // ── FLAG 0: demais sites do coordMap (não são incidentes ativos) ──
+      Object.keys(coordMap).slice(0, 3000).forEach(function(eid) {
+        if (eidsAtivos[eid]) return; // já está no FLAG 1
+        var c = coordMap[eid];
+        var nome = siteByEndId[eid] || eid;
+        var m = window.L.circleMarker(c, {
+          radius:4, color:'#444', fillColor:'#666', fillOpacity:0.45, weight:1
+        });
+        m._d = { eid:eid, site:nome, cidade:'' };
+        m.bindTooltip(nome + ' (' + eid + ')', { direction:'top' });
+        m.addTo(layers.flag0);
+      });
+
+      updateStats(incAtivos.length, cTSK, cSemCoord);
+      _populateCityDL('');
+      calcSemCoordList();
+    }
+
+    function updateStats(total, comTSK, semCoord) {
+      _lastStats = { total:total, comTSK:comTSK, semCoord:semCoord };
+      statsEl.innerHTML = '';
+      [
+        { text:'Sites fora: ' + total, cor:'#e74c3c' },
+        { text:'Sem coord: ' + semCoord, cor:'var(--tne-muted)' },
+        { text:'MW: ' + mwData.length, cor:'var(--tne-muted)' },
+        { text:'FO: ' + foData.length, cor:'#2ecc71' },
+      ].forEach(function(item) {
+        statsEl.appendChild(U.h('span', { style:{ fontSize:'12px', color:item.cor } }, item.text));
+      });
+      var tskEl = document.createElement('span');
+      tskEl.textContent = 'Com TSK: ' + comTSK + (_filtros.soTSK ? ' ✓' : '');
+      tskEl.title = 'Clique para mostrar somente sites com TSK aberta';
+      tskEl.style.cssText = 'font-size:12px;cursor:pointer;padding:2px 8px;border-radius:6px;transition:all .15s;color:#3498db;'
+        + (_filtros.soTSK ? 'font-weight:700;border:1px solid #3498db88;background:rgba(52,152,219,.13);' : 'border:1px solid transparent;');
+      tskEl.addEventListener('click', function() {
+        _filtros.soTSK = !_filtros.soTSK;
+        applyMarkerFilter();
+        updateStats(_lastStats.total, _lastStats.comTSK, _lastStats.semCoord);
+      });
+      statsEl.appendChild(tskEl);
+    }
+
+    // ── Buscar via ponte ────────────────────────────────────────
+    function buscarViaPonte() {
+      btnPonte.textContent = 'Buscando...';
+      btnPonte.disabled = true;
+      fetch(PONTE_URL + '/api/saude')
+        .then(function(r) { return r.json(); })
+        .then(function() {
+          return fetch(PONTE_URL + '/api/mapa?flag=');
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(json) {
+          if (json.erro) { U.toast('Erro da ponte: ' + json.erro, 'err'); return; }
+          var sites = json.sites || [];
+          // Separar: sites fora reais (flag=1) e demais (flag=0)
+          // A ponte retorna TODOS — usamos só os flag=1 para atualizar o mapa de incidentes
+          U.toast('Mapa: ' + sites.length + ' sites da ponte. Atualizando incidentes...', 'ok');
+          getLeaflet(function() {
+            initMap();
+            // 1) Renderiza os sites primeiro (popula sitesFlag1/sitesFlag0Raw)
+            layers.flag1.clearLayers();
+            renderSites(sites);
+            // 2) SÓ DEPOIS renderiza MW/FO — assim eidsAtivos já reflete os dados da ponte
+            renderEstaticos();
+          });
+        })
+        .catch(function(e) {
+          U.toast('Ponte não disponível. Use "Importar Genesis HTML" ou inicie o ponte_tne.py.', 'err');
+        })
+        .finally(function() { btnPonte.textContent = 'Buscar sites (ponte + VPN)'; btnPonte.disabled = false; });
+    }
+
+    btnPonte.addEventListener('click', buscarViaPonte);
+    btnImport.addEventListener('click', function(){ fileInput.click(); });
+    fileInput.addEventListener('change', function(e) {
+      var file = e.target.files[0]; if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function(ev) {
+        var result = parseGenesisParaMapa(ev.target.result);
+        coordMap = result.coordMap; mwData = result.mwData; foData = result.foData;
+        mapaMarkers = result.markerData || [];
+        fileInput.value = '';
+        if (result.coordCount > 0) {
+          U.toast('Genesis: ' + result.siteCount + ' sites / ' + result.coordCount + ' coords importadas.', 'ok');
+          if (TNE.api && TNE.api.saveMapaCoords) {
+            TNE.api.saveMapaCoords(result.coordMap).catch(function() {});
+          }
+        } else {
+          var di = result.debugInfo || {};
+          var msg = 'ATENÇÃO: 0 coordenadas encontradas neste HTML.\n\n'
+            + 'Variáveis JS detectadas no arquivo: ' + (di.varsFound && di.varsFound.length ? di.varsFound.join(', ') : 'nenhuma') + '\n'
+            + 'Tamanho do arquivo: ' + (di.htmlLen || 0) + ' chars\n\n'
+            + 'Verifique se este é o HTML do MAPA do Genesis (não o de incidentes).\n'
+            + 'Primeiros caracteres do arquivo:\n' + (di.snippet || '');
+          alert(msg);
+          U.toast('Formato não reconhecido — 0 coords. Verifique se é o HTML correto.', 'err');
+        }
+        getLeaflet(function() {
+          initMap();
+          if (mapaMarkers.length) renderSites(mapaMarkers);
+          else renderComCoordMap();
+          renderEstaticos();
+        });
+      };
+      reader.readAsText(file, 'utf-8');
+    });
+
+    // ── Handler global de geocodificação para callbacks nos popups ───────
+    TNE._geocodTSK = function(eid, latGenesis, lonGenesis, endEnc, cidEnc, bairroEnc, el) {
+      var log = decodeURIComponent(endEnc), cid = decodeURIComponent(cidEnc), bai = decodeURIComponent(bairroEnc);
+      geocodificarEndereco(log, cid, bai, function(err, res) {
+        var btn = el && el.querySelector('.geo-btn');
+        if (err) {
+          if (btn) { btn.textContent = '⚠ ' + err; btn.disabled = false; }
+          return;
+        }
+        // Marcar posição TSK com marcador laranja diferenciado
+        var mTSK = window.L.marker([res.lat, res.lon], { icon: divIcon('#ff8c00', 16) });
+        mTSK.bindPopup('<b style="color:#ff8c00">📍 Endereço TSK</b><br>' + log + (bai?', '+bai:'') + '<br>' + cid
+          + '<br><small style="color:#888">Coord. Genesis do site:</small> ' + latGenesis.toFixed(5) + ', ' + lonGenesis.toFixed(5)
+          + '<br><small style="color:#888">Coord. endereço TSK:</small> ' + res.lat.toFixed(5) + ', ' + res.lon.toFixed(5));
+        mTSK.addTo(mapInstance);
+
+        // Desenhar linha entre Genesis e endereço TSK
+        var linhaTSK = window.L.polyline([[latGenesis, lonGenesis],[res.lat, res.lon]], {
+          color:'#ff8c00', weight:2, dashArray:'4,4', opacity:0.7
+        }).addTo(mapInstance);
+
+        // Distância entre os dois pontos
+        var distM = haversineKm(latGenesis, lonGenesis, res.lat, res.lon);
+        if (btn) btn.textContent = '✓ ' + distM.toFixed(2) + ' km do endereço cadastral';
+
+        mapInstance.fitBounds([[latGenesis, lonGenesis],[res.lat, res.lon]], { padding:[40,40], maxZoom:15 });
+
+        // Limpa após 30s para não poluir o mapa
+        setTimeout(function(){ mTSK.remove(); linhaTSK.remove(); }, 30000);
+      });
+    };
+
+    // ── Iniciar mapa automaticamente se tiver dados ────────────
+    var temMW       = mwData.length > 0;
+    var temMarkers  = mapaMarkers.length > 0;
+    var temCoords   = Object.keys(coordMap).length > 0; // true se defaultCoordMap carregou
+    var temInc      = incidents.filter(function(i){ return (i.statusTrat||'').toUpperCase()!=='RESOLVIDO'; }).length > 0;
+
+    getLeaflet(function() {
+      initMap();
+      // Prioridade de renderização:
+      // 1) mapaMarkers (do Genesis Mapa HTML — tem coords + campo tempo para coloração)
+      // 2) coordMap + incidentes (sempre disponível graças ao defaultCoordMap embutido)
+      if (temMarkers) {
+        renderSites(mapaMarkers);
+      } else if (temCoords || temInc) {
+        renderComCoordMap();
+      }
+      renderEstaticos();
+      if (!temMarkers && !temCoords && !temInc) {
+        U.toast('Importe os dados de incidentes ou use "Buscar sites (ponte + VPN)" para ver os marcadores.', 'ok');
+      }
+    });
+  };
+
+})(window.TNE = window.TNE || {});

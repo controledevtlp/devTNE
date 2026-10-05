@@ -1,0 +1,389 @@
+﻿/* Estilos complementares ao Tailwind (tema escuro TNE) */
+:root {
+  --tne-bg: #0a0a0f;
+  --tne-card: #13131a;
+  --tne-card2: #1a1a24;
+  --tne-popover: #1a1a24;
+  --tne-primary: #ff8c00;
+  --tne-primary2: #ffb347;
+  --tne-red: #e74c3c;
+  --tne-green: #2ecc71;
+  --tne-blue: #3498db;
+  --tne-fg: #f0f0f0;
+  --tne-muted: #8a8a93;
+  --tne-border: rgba(255, 140, 0, 0.15);
+  --tne-border2: rgba(255, 140, 0, 0.32);
+}
+
+/* Tema claro — ativado via <html data-theme="light"> (ver app.js, toggle no menu) */
+html[data-theme="light"] {
+  --tne-bg: #f3f4f7;
+  --tne-card: #ffffff;
+  --tne-card2: #eef0f5;
+  --tne-popover: #ffffff;
+  --tne-primary: #e07a00;
+  --tne-primary2: #ff8c00;
+  --tne-red: #d6334a;
+  --tne-green: #1f9d57;
+  --tne-blue: #2a7fc9;
+  --tne-fg: #181820;
+  --tne-muted: #5a5d6b;
+  --tne-border: rgba(224, 122, 0, 0.18);
+  --tne-border2: rgba(224, 122, 0, 0.38);
+}
+
+/* Título com fonte mais executiva/chamativa (Sora) — usado no pageHeader e nos cabeçalhos das páginas */
+.tne-heading {
+  font-family: 'Sora', ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: -0.01em;
+}
+
+html, body { background: var(--tne-bg); color: var(--tne-fg); }
+body { font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif; position: relative; }
+
+/* brilho ambiente sutil de fundo, igual ao dashboard de referência */
+body::before {
+  content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background:
+    radial-gradient(ellipse at 10% 0%, rgba(255,140,0,0.10) 0%, transparent 50%),
+    radial-gradient(ellipse at 90% 100%, rgba(255,80,0,0.07) 0%, transparent 50%);
+}
+#app-shell { position: relative; z-index: 1; }
+
+/* Scrollbar discreta */
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,140,0,0.25); border-radius: 6px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,140,0,0.45); }
+
+.tne-card {
+  background: var(--tne-card);
+  border: 1px solid var(--tne-border);
+  border-radius: 14px;
+}
+
+.tne-link {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px; border-radius: 10px;
+  color: #cfcfd6; font-size: 14px; font-weight: 500;
+  cursor: pointer; transition: all .15s ease; text-decoration: none;
+}
+.tne-link:hover { background: rgba(255,140,0,0.10); color: #fff; }
+.tne-link.active { background: rgba(255,140,0,0.16); color: var(--tne-primary); }
+.tne-link .ico { width: 18px; text-align: center; }
+
+/* KPI: elevação + brilho colorido no hover (cor é definida via inline style por card) */
+.tne-kpi {
+  cursor: pointer; position: relative; overflow: hidden;
+  transition: transform .25s cubic-bezier(.4,0,.2,1), box-shadow .25s ease, border-color .25s ease;
+}
+.tne-kpi:hover {
+  transform: translateY(-5px);
+  border-color: rgba(255,140,0,.5);
+  box-shadow: 0 20px 40px rgba(0,0,0,.5), 0 0 30px rgba(255,140,0,.15);
+}
+
+.tne-btn {
+  display: inline-flex; align-items: center; gap: 8px; justify-content: center;
+  padding: 8px 14px; border-radius: 10px; font-size: 14px; font-weight: 600;
+  cursor: pointer; border: 1px solid transparent; transition: all .18s ease;
+}
+.tne-btn-primary { background: var(--tne-primary); color: #111; box-shadow: 0 2px 10px rgba(255,140,0,.25); }
+.tne-btn-primary:hover { background: #ffa733; transform: translateY(-1px); box-shadow: 0 6px 18px rgba(255,140,0,.35); }
+.tne-btn-ghost { background: transparent; color: var(--tne-fg); border-color: var(--tne-border); }
+.tne-btn-ghost:hover { background: rgba(255,140,0,0.10); border-color: var(--tne-border2); }
+.tne-btn-lg { padding: 14px 28px; font-size: 15.5px; border-radius: 12px; }
+.tne-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+.tne-input, .tne-select {
+  background: var(--tne-popover); color: var(--tne-fg);
+  border: 1px solid var(--tne-border); border-radius: 10px;
+  padding: 8px 12px; font-size: 14px; outline: none; width: 100%;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.tne-input:focus, .tne-select:focus { border-color: var(--tne-primary); box-shadow: 0 0 0 3px rgba(255,140,0,.12); }
+.tne-select option { background: var(--tne-popover); color: var(--tne-fg); }
+
+.tne-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tne-table th {
+  text-align: left; padding: 9px 10px; color: var(--tne-muted);
+  font-weight: 600; border-bottom: 1px solid var(--tne-border);
+  position: sticky; top: 0; background: var(--tne-card);
+  text-transform: uppercase; font-size: 11px; letter-spacing: .4px;
+}
+.tne-table td { padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,.05); transition: background .12s ease; }
+.tne-table tr:hover td { background: rgba(255,140,0,0.07); }
+
+.tne-badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+
+/* Cartão de gráfico: cabeçalho com "pulso" + hover de borda/sombra */
+.tne-chart-card { transition: border-color .25s ease, box-shadow .25s ease; }
+.tne-chart-card:hover { border-color: rgba(255,140,0,.4); box-shadow: 0 8px 32px rgba(0,0,0,.4); }
+
+/* Tile de métrica clicável (Visão Regional e similares) */
+.tne-metric-tile {
+  cursor: pointer; padding: 10px 12px; border-radius: 10px;
+  background: rgba(255,255,255,.02); border: 1px solid transparent;
+  transition: background .2s ease, border-color .2s ease, transform .2s ease, box-shadow .2s ease;
+}
+.tne-metric-tile:hover {
+  background: rgba(255,140,0,.08); border-color: rgba(255,140,0,.35);
+  transform: translateY(-3px); box-shadow: 0 8px 18px rgba(0,0,0,.35);
+}
+.tne-metric-tile .ic { font-size: 15px; opacity: .85; }
+.tne-chart-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--tne-primary); box-shadow: 0 0 10px var(--tne-primary); flex-shrink: 0; }
+
+/* Dropzone reutilizável (upload de arquivos) */
+.tne-dropzone {
+  border: 2px dashed var(--tne-border2);
+  border-radius: 14px; background: rgba(255,255,255,0.02);
+  padding: 30px 18px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 10px; text-align: center; cursor: pointer; transition: all .22s ease; min-height: 190px;
+}
+.tne-dropzone:hover, .tne-dropzone.dragover {
+  border-color: var(--tne-primary); background: rgba(255,140,0,.06); transform: translateY(-2px);
+}
+.tne-dropzone-icon {
+  width: 52px; height: 52px; border-radius: 14px; background: var(--tne-card2);
+  border: 1px solid var(--tne-border); display: flex; align-items: center; justify-content: center;
+  font-size: 22px; box-shadow: 0 8px 20px rgba(0,0,0,.4);
+}
+.tne-dropzone-title { font-size: 14.5px; font-weight: 700; color: var(--tne-fg); }
+.tne-dropzone-sub { font-size: 12px; color: var(--tne-muted); line-height: 1.5; }
+
+/* Barra de resumo (total em destaque + chips compactos ao lado) */
+.tne-resumo-bar {
+  display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center;
+  background: rgba(255,140,0,0.05); border: 1px solid rgba(255,140,0,.15);
+  border-radius: 10px; padding: 8px 14px;
+}
+.tne-resumo-total { display: flex; align-items: baseline; gap: 7px; padding-right: 14px; border-right: 1px solid rgba(255,140,0,.2); margin-right: 2px; }
+.tne-resumo-total-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--tne-muted); white-space: nowrap; }
+.tne-resumo-total-valor { font-size: 22px; font-weight: 800; color: #ff4444; text-shadow: 0 0 12px rgba(255,68,68,.35); line-height: 1; }
+.tne-resumo-grid { display: flex; flex-wrap: wrap; gap: 6px 8px; flex: 1; }
+.tne-resumo-item {
+  display: flex; align-items: center; gap: 5px; padding: 3px 9px;
+  background: rgba(255,255,255,.03); border: 1px solid var(--tne-border); border-radius: 999px;
+  transition: background .15s ease, border-color .15s ease;
+}
+.tne-resumo-item:hover { background: rgba(255,140,0,.08); border-color: var(--tne-border2); }
+.tne-resumo-nome { font-size: 11px; color: var(--tne-muted); }
+.tne-resumo-val { font-size: 12.5px; font-weight: 700; color: var(--tne-fg); }
+.tne-resumo-pct { font-size: 10px; color: rgba(255,140,0,.75); }
+
+/* Switch (toggle) reutilizável — com hover/glow e thumb animado */
+.tne-switch-wrap { display: inline-flex; align-items: center; gap: 9px; cursor: pointer; user-select: none; }
+.tne-switch-input { display: none; }
+.tne-switch-track {
+  width: 38px; height: 21px; border-radius: 999px; background: var(--tne-card2);
+  border: 1px solid var(--tne-border2); position: relative; flex-shrink: 0;
+  transition: background .2s ease, border-color .2s ease, box-shadow .2s ease;
+}
+.tne-switch-thumb {
+  position: absolute; top: 2px; left: 2px; width: 15px; height: 15px; border-radius: 50%;
+  background: var(--tne-muted); transition: transform .25s cubic-bezier(.4,0,.2,1), background .2s ease, box-shadow .2s ease;
+}
+.tne-switch-wrap:hover .tne-switch-track { border-color: var(--tne-primary); box-shadow: 0 0 10px rgba(255,140,0,.3); }
+.tne-switch-input:checked ~ .tne-switch-track { background: rgba(255,140,0,.22); border-color: var(--tne-primary); }
+.tne-switch-input:checked ~ .tne-switch-track .tne-switch-thumb { transform: translateX(17px); background: var(--tne-primary); box-shadow: 0 0 9px var(--tne-primary); }
+.tne-switch-wrap:hover .tne-switch-input:checked ~ .tne-switch-track { box-shadow: 0 0 14px rgba(255,140,0,.5); }
+.tne-switch-label { font-size: 12px; color: var(--tne-muted); transition: color .2s ease; }
+.tne-switch-wrap:hover .tne-switch-label { color: var(--tne-fg); }
+
+/* Logo nos títulos — com destaque suave no hover */
+.tne-logo-hover {
+  transition: transform .25s cubic-bezier(.4,0,.2,1), filter .25s ease;
+  border-radius: 8px;
+}
+.tne-logo-hover:hover { transform: scale(1.14) rotate(-2deg); filter: drop-shadow(0 0 10px var(--tne-primary)) brightness(1.08); }
+.tne-pulse-dot {
+  display: inline-flex; width: 9px; height: 9px; border-radius: 50%; background: #ff5a5a;
+  box-shadow: 0 0 0 0 rgba(255,90,90,.65); animation: tmgPulseWarn 1.4s infinite; flex-shrink: 0;
+}
+@keyframes tmgPulseWarn {
+  0% { transform: scale(.95); box-shadow: 0 0 0 0 rgba(255,90,90,.65); }
+  70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(255,90,90,0); }
+  100% { transform: scale(.95); box-shadow: 0 0 0 0 rgba(255,90,90,0); }
+}
+
+/* Revelação progressiva nativa (<details>) usada no Importar Dados */
+.tne-details > summary {
+  cursor: pointer; list-style: none; color: var(--tne-primary);
+  font-size: 13px; font-weight: 600; padding: 6px 0; user-select: none;
+}
+.tne-details > summary::-webkit-details-marker { display: none; }
+.tne-details > summary::before { content: '▸ '; }
+.tne-details[open] > summary::before { content: '▾ '; }
+.tne-details[open] > summary { margin-bottom: 10px; }
+
+/* Modal */
+.tne-modal-bg {
+  position: fixed; inset: 0; background: rgba(0,0,0,.65);
+  display: flex; align-items: center; justify-content: center; z-index: 60; padding: 16px;
+}
+.tne-modal {
+  background: var(--tne-card); border: 1px solid var(--tne-border); border-radius: 16px;
+  width: 96vw; max-width: 1500px; max-height: 90vh; display: flex; flex-direction: column;
+  box-shadow: 0 40px 80px rgba(0,0,0,.6);
+}
+
+/* Menu lateral retrátil: fica fora da tela e só aparece com hover na
+   borda esquerda (ou pelo botão, para quem não tem mouse). Sobrepõe o
+   conteúdo em vez de empurrar — prioriza a visualização da aba escolhida. */
+#sidebar {
+  position: fixed; top: 0; left: 0; height: 100vh; z-index: 65;
+  transform: translateX(-100%);
+  transition: transform .22s cubic-bezier(.4,0,.2,1);
+  box-shadow: 10px 0 36px rgba(0,0,0,.55);
+}
+body.tne-sidebar-open #sidebar { transform: translateX(0); }
+#sidebar-hover-zone { position: fixed; top: 0; left: 0; width: 16px; height: 100vh; z-index: 64; }
+#sidebar-toggle-btn {
+  position: fixed; top: 14px; left: 14px; z-index: 70;
+  width: 38px; height: 38px; border-radius: 10px;
+  background: var(--tne-card); border: 1px solid var(--tne-border);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; box-shadow: 0 4px 16px rgba(0,0,0,.45);
+  color: var(--tne-fg); font-size: 17px; line-height: 1;
+  transition: border-color .18s ease, color .18s ease, opacity .18s ease;
+}
+#sidebar-toggle-btn:hover { border-color: var(--tne-primary); color: var(--tne-primary); }
+body.tne-sidebar-open #sidebar-toggle-btn { opacity: 0; pointer-events: none; }
+
+/* Toast */
+#tne-toasts { position: fixed; top: 16px; right: 16px; z-index: 80; display: flex; flex-direction: column; gap: 8px; }
+.tne-toast {
+  background: var(--tne-popover); border: 1px solid var(--tne-border); color: var(--tne-fg);
+  padding: 11px 16px; border-radius: 10px; font-size: 14px; box-shadow: 0 8px 24px rgba(0,0,0,.5);
+  min-width: 240px; max-width: 360px; animation: tmgslide .2s ease;
+}
+.tne-toast.ok { border-left: 3px solid #2ecc71; }
+.tne-toast.err { border-left: 3px solid #e74c3c; }
+.tne-toast.info { border-left: 3px solid #ff8c00; }
+@keyframes tmgslide { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: none; } }
+
+/* Loading (com mensagem opcional de etapa) */
+#tne-loading {
+  position: fixed; inset: 0; background: rgba(10,10,15,.6); z-index: 90;
+  display: none; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+  backdrop-filter: blur(2px);
+}
+#tne-loading.show { display: flex; }
+#tne-loading-msg { font-size: 13px; max-width: 280px; text-align: center; }
+.tne-spin {
+  width: 46px; height: 46px; border: 4px solid rgba(255,140,0,.25);
+  border-top-color: var(--tne-primary); border-radius: 50%; animation: tmgspin .8s linear infinite;
+}
+@keyframes tmgspin { to { transform: rotate(360deg); } }
+
+.chart-wrap { position: relative; height: 280px; }
+.chart-wrap.sm { height: 230px; }
+
+/* ===== EFEITO DE HOVER PARA ITENS CLICÁVEIS / GRÁFICOS ===== */
+/* classe para itens clicáveis dentro do DOM (botões, opções, itens do gráfico) */
+.clickable {
+  transition: background-color .12s ease, border-color .12s ease, box-shadow .12s ease, transform .08s ease;
+  cursor: pointer;
+  border-radius: 8px;
+}
+
+/* destaque mais claro ao passar o mouse + borda "quase branca" */
+.clickable:hover {
+  background-color: rgba(255,255,255,0.06); /* cor mais clara */
+  border: 1px solid rgba(255,255,255,0.35); /* borda esbranquiçada no hover */
+  box-shadow: 0 6px 18px rgba(255,255,255,0.04);
+  transform: translateY(-2px);
+}
+
+/* evitar que rótulos/moldura do gráfico tenham hover */
+/* aplique .chart-frame nas divs que representam moldura do gráfico */
+.chart-frame, .chart-frame .chart-label {
+  pointer-events: none;    /* impede efeito hover sobre labels/moldura */
+  background: transparent;
+  box-shadow: none;
+  border: none;
+}
+
+/* Quando for elemento interativo dentro do gráfico (legendas clicáveis, barras customizadas)
+   adicionar classe `.chart-clickable` via JS para aplicar o efeito sem aplicar em labels */
+.chart-clickable { /* herda do .clickable */
+  transition: background-color .12s ease, border-color .12s ease, box-shadow .12s ease, transform .08s ease;
+  cursor: pointer;
+  border-radius: 6px;
+}
+.chart-clickable:hover {
+  background-color: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.28);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+}
+
+/* Ajustes visuais para botões/links que já existem */
+.tne-link.clickable, .tne-btn.clickable { display:inline-flex; align-items:center; }
+
+/* ── Leaflet: corrige conflito com preflight Tailwind CDN ─────────────── */
+/* Tailwind seta max-width:100% e height:auto em todas as imagens,        */
+/* o que deforma os tiles e cria o efeito de "quadrados separados".       */
+.leaflet-container .leaflet-layer img,
+.leaflet-container img.leaflet-tile {
+  max-width: none !important;
+  max-height: none !important;
+  width: auto !important;
+  height: auto !important;
+  display: inline !important;
+}
+/* Fundo escuro igual ao tileset — elimina "buracos" durante o carregamento */
+.leaflet-container { background: #1a1a2e !important; font-family: inherit; }
+/* Popups com tema TNE */
+.leaflet-popup-content-wrapper {
+  background: var(--tne-card2) !important;
+  color: var(--tne-fg) !important;
+  border: 1px solid var(--tne-border) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 4px 24px rgba(0,0,0,.6) !important;
+}
+.leaflet-popup-tip { background: var(--tne-card2) !important; }
+.leaflet-popup-close-button { color: var(--tne-muted) !important; }
+.leaflet-popup-close-button:hover { color: var(--tne-primary) !important; background: transparent !important; }
+.leaflet-popup-content { margin: 10px 14px !important; }
+/* Controles de zoom no tema escuro */
+.leaflet-bar a {
+  background: var(--tne-card2) !important;
+  color: var(--tne-fg) !important;
+  border-color: var(--tne-border) !important;
+}
+.leaflet-bar a:hover { background: var(--tne-card) !important; color: var(--tne-primary) !important; }
+/* Tooltip do mapa */
+.leaflet-tooltip {
+  background: var(--tne-card2) !important;
+  color: var(--tne-fg) !important;
+  border: 1px solid var(--tne-border) !important;
+  border-radius: 6px !important;
+  font-size: 11px !important;
+  box-shadow: 0 2px 10px rgba(0,0,0,.4) !important;
+}
+.leaflet-tooltip::before { border-top-color: var(--tne-border) !important; }
+
+/* Rodapé "Equipe de Desenvolvimento" — usado tanto no painel principal
+   quanto no dashboard público, pra manter o crédito sempre visível. */
+.tne-dev-footer { margin-top: 40px; padding: 28px 16px 22px; border-top: 1px solid var(--tne-border); text-align: center; }
+.tne-dev-footer-title {
+  display: flex; align-items: center; justify-content: center; gap: 14px;
+  font-size: 11px; font-weight: 700; letter-spacing: 2px; color: var(--tne-muted);
+  text-transform: uppercase; margin-bottom: 20px;
+}
+.tne-dev-footer-title::before, .tne-dev-footer-title::after { content: ''; height: 1px; width: 56px; background: linear-gradient(90deg, transparent, var(--tne-border2)); }
+.tne-dev-footer-title::after { background: linear-gradient(90deg, var(--tne-border2), transparent); }
+.tne-dev-cards { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; max-width: 640px; margin: 0 auto; }
+.tne-dev-card {
+  display: flex; align-items: center; gap: 12px; background: var(--tne-card);
+  border: 1px solid var(--tne-border); border-radius: 14px; padding: 14px 20px;
+  text-align: left; min-width: 240px; flex: 1;
+  transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
+}
+.tne-dev-card:hover { transform: translateY(-2px); border-color: var(--tne-border2); box-shadow: 0 6px 18px rgba(0,0,0,.25); }
+.tne-dev-avatar { width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px; color: #fff; flex-shrink: 0; }
+.tne-dev-role { font-size: 10px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; }
+.tne-dev-name { font-size: 14px; font-weight: 700; color: var(--tne-fg); margin: 1px 0; }
+.tne-dev-email { font-size: 12px; color: var(--tne-muted); text-decoration: none; transition: color .15s ease; }
+.tne-dev-email:hover { color: var(--tne-primary); text-decoration: underline; }
+.tne-dev-footer-copy { font-size: 11px; color: var(--tne-muted); margin-top: 18px; opacity: .8; }
