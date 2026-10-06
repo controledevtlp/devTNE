@@ -91,7 +91,7 @@
   function buildSidebar() {
     var user = TNE.auth.getUser() || {};
     var brand = U.h('div', { class: 'flex items-center gap-3 px-4 py-4' }, [
-      U.h('img', { src: 'assets/logo-TNE.png', alt: 'TNE', style: { width: '38px', height: '38px', objectFit: 'contain' } }),
+      U.h('img', { src: 'assets/logo-tne.png', alt: 'TNE', style: { width: '38px', height: '38px', objectFit: 'contain' } }),
       U.h('div', null, [
         U.h('div', { class: 'font-extrabold text-sm', style: { color: 'var(--tne-primary)', letterSpacing: '.5px' }, text: TNE.config.APP_NAME || 'Controle TNE' }),
         U.h('div', { class: 'text-xs', style: { color: 'var(--tne-muted)' }, text: TNE.config.APP_SUB || 'Operacional' })

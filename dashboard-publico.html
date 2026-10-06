@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Controle TNE · Dashboard (visualização pública)</title>
-<link rel="icon" href="assets/logo-TNE.png">
+<link rel="icon" href="assets/logo-tne.png">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
@@ -261,7 +261,7 @@ body { min-height: 100vh; }
     var regioesSelecionaveis = C.REGIOES.filter(function (r) { return r !== 'OTHERS'; });
 
     var wrap = U.h('div', { class: 'welcome-wrap' }, [
-      U.h('img', { src: 'assets/logo-TNE.png', alt: '', class: 'welcome-logo' }),
+      U.h('img', { src: 'assets/logo-tne.png', alt: '', class: 'welcome-logo' }),
       U.h('div', { class: 'welcome-title tne-heading', text: 'BEM-VINDO, GESTOR' }),
       U.h('div', { class: 'welcome-sub', text: 'Escolha sua região para visualização' }),
       U.h('div', {

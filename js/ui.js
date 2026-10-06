@@ -887,7 +887,7 @@
   U.pageHeader = function (title, subtitle, right, opts) {
     opts = opts || {};
     var logoSize = opts.compact ? '30px' : '42px';
-    var logo = h('img', { src: 'assets/logo-TNE.png', alt: '', class: 'tne-logo-hover', style: { width: logoSize, height: logoSize, objectFit: 'contain', flexShrink: '0' } });
+    var logo = h('img', { src: 'assets/logo-tne.png', alt: '', class: 'tne-logo-hover', style: { width: logoSize, height: logoSize, objectFit: 'contain', flexShrink: '0' } });
     var tituloEl = h('h1', { class: 'tne-heading font-extrabold flex items-center gap-2', style: { fontSize: opts.compact ? '17px' : '26px' } }, [logo, h('span', { text: title })]);
     return h('div', { class: 'flex items-end justify-between flex-wrap gap-3', style: { marginBottom: opts.compact ? '10px' : '20px' } }, [
       h('div', null, [
