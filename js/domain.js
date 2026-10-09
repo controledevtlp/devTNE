@@ -2018,7 +2018,11 @@
   }
 
   function classificarCciCampo(filaAtual) {
-    return normalize(filaAtual).indexOf('OPERADOR_') >= 0 ? 'CCI' : 'Campo';
+    var s = normalize(filaAtual);
+    if (s.indexOf('COMMAND_CENTER_FMMT_') >= 0) return 'CCI';  // COMMAND_CENTER_FMMT_AL/BA/PI/SE/CE/PB/PE/RN
+    if (s.indexOf('CENTRALIZADO_FMT_TNE') >= 0) return 'CCI';
+    if (s.indexOf('COMMAND CENTER') >= 0) return 'CCI';         // COMMAND CENTER - FMM
+    return 'Campo';
   }
 
   function dedupPorTsk(rows) {
