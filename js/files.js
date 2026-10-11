@@ -72,12 +72,19 @@
   }
   function dtv(v) {
     if (v == null || v === '') return null;
-    if (v instanceof Date) return isNaN(v.getTime()) ? null : v.toISOString();
+    var p2 = function (n) { return String(n).padStart(2, '0'); };
+    if (v instanceof Date) {
+      if (isNaN(v.getTime())) return null;
+      return v.getUTCFullYear() + '-' + p2(v.getUTCMonth() + 1) + '-' + p2(v.getUTCDate())
+        + 'T' + p2(v.getUTCHours()) + ':' + p2(v.getUTCMinutes()) + ':' + p2(v.getUTCSeconds());
+    }
     if (typeof v === 'number') {
       // serial do Excel -> data (epoch 1899-12-30)
       var ms = Math.round((v - 25569) * 86400 * 1000);
       var d = new Date(ms);
-      return isNaN(d.getTime()) ? null : d.toISOString();
+      if (isNaN(d.getTime())) return null;
+      return d.getUTCFullYear() + '-' + p2(d.getUTCMonth() + 1) + '-' + p2(d.getUTCDate())
+        + 'T' + p2(d.getUTCHours()) + ':' + p2(d.getUTCMinutes()) + ':' + p2(d.getUTCSeconds());
     }
     var s = String(v).trim();
     if (!s || JUNK[s.toLowerCase()]) return null;
