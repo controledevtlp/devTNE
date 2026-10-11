@@ -273,6 +273,18 @@
         if (cached) {
           validMap = cached;
           validMapFromCache = true;
+          // Cache hit: busca delta — apenas IDs novos ausentes do cache (não invalida o TTL)
+          var _missingIds = ids.filter(function (id) { return !cached[id]; });
+          if (_missingIds.length) {
+            try {
+              var _lkD = await TNE.api.lookupCities(_missingIds);
+              if (_lkD && _lkD.map && Object.keys(_lkD.map).length) {
+                validMap = Object.assign({}, cached, _lkD.map);
+                _vmapSave(validMap);
+                validMapFromCache = false;
+              }
+            } catch (e) { /* delta falhou: usa cache parcial */ }
+          }
         } else {
           try {
             var lk = await TNE.api.lookupCities(ids);
@@ -437,6 +449,18 @@
         if (cached) {
           validMap = cached;
           validMapFromCache = true;
+          // Cache hit: busca delta — apenas IDs novos ausentes do cache (não invalida o TTL)
+          var _missingIds = ids.filter(function (id) { return !cached[id]; });
+          if (_missingIds.length) {
+            try {
+              var _lkD = await TNE.api.lookupCities(_missingIds);
+              if (_lkD && _lkD.map && Object.keys(_lkD.map).length) {
+                validMap = Object.assign({}, cached, _lkD.map);
+                _vmapSave(validMap);
+                validMapFromCache = false;
+              }
+            } catch (e) { /* delta falhou: usa cache parcial */ }
+          }
         } else {
           try {
             var lk = await TNE.api.lookupCities(ids);

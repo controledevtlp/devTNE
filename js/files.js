@@ -91,11 +91,21 @@
   }
 
   // ------------------------------------------------------------------
-  // 2) PARSE de um arquivo .xlsx em memória -> lista de tarefas
+  // 2) PARSE de um arquivo .xlsx ou .csv em memória -> lista de tarefas
   // ------------------------------------------------------------------
-  function parseArrayBuffer(buf) {
+  function parseArrayBuffer(buf, fileName) {
     if (typeof XLSX === 'undefined') throw new Error('Biblioteca de leitura de Excel não carregou. Recarregue a página.');
-    var wb = XLSX.read(buf, { type: 'array', cellDates: true });
+    var wb;
+    if (/\.csv$/i.test(fileName || '')) {
+      var uint8 = new Uint8Array(buf);
+      var text;
+      try { text = new TextDecoder('utf-8', { fatal: true }).decode(uint8); }
+      catch (e) { text = new TextDecoder('windows-1252').decode(uint8); }
+      text = text.replace(/^﻿/, '');
+      wb = XLSX.read(text, { type: 'string' });
+    } else {
+      wb = XLSX.read(buf, { type: 'array', cellDates: true });
+    }
     var ws = wb.Sheets[wb.SheetNames[0]];
     if (!ws) return [];
     var rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
@@ -124,9 +134,10 @@
     return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   }
   function isExcelName(name) { return /\.xlsx?$/i.test(name || ''); }
+  function isCsvName(name)   { return /\.csv$/i.test(name || ''); }
   function isAtividadesFile(name) {
     var n = norm(name);
-    return isExcelName(name) && n.indexOf('atividades-tne_fmmt') >= 0;
+    return (isExcelName(name) || isCsvName(name)) && n.indexOf('atividades-tne_fmmt') >= 0;
   }
   function isNaoAgendada(name) {
     var n = norm(name);
@@ -343,7 +354,7 @@
 
     // Processar cada arquivo encontrado e atualizar só o tipo correspondente
     for (var i = 0; i < chosen.length; i++) {
-      var parsed = parseArrayBuffer(buffers[i]);
+      var parsed = parseArrayBuffer(buffers[i], chosen[i].name);
       var slotMeta = { nome: chosen[i].name, qtd: parsed.length, em: new Date().toISOString() };
       arquivos.push({ nome: chosen[i].name, qtd: parsed.length });
       if (chosen[i].naoAgendada) {
@@ -464,8 +475,8 @@
   // ------------------------------------------------------------------
   F.readManualFiles = async function (fileList, onProgress) {
     var files = Array.prototype.slice.call(fileList || []);
-    var xls = files.filter(function (f) { return isExcelName(f.name); });
-    if (!xls.length) throw new Error('Selecione um ou mais arquivos .xlsx (Atividades-tne_FMMT).');
+    var xls = files.filter(function (f) { return isExcelName(f.name) || isCsvName(f.name); });
+    if (!xls.length) throw new Error('Selecione um ou mais arquivos .xlsx ou .csv (Atividades-tne_FMMT).');
     var matches = xls.map(function (f) {
       return { name: f.name, file: f, naoAgendada: isNaoAgendada(f.name), key: dateKey(f.name, f.lastModified) };
     });
@@ -510,7 +521,7 @@
 
   F.previewFile = async function (file) {
     var buf = await file.arrayBuffer();
-    var parsed = parseArrayBuffer(buf);
+    var parsed = parseArrayBuffer(buf, file.name);
     return { total: parsed.length, amostra: parsed.slice(0, 5) };
   };
 
