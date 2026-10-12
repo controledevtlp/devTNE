@@ -1,12 +1,12 @@
-/* Página: Dashboard */
-(function (TMG) {
-  TMG.pages = TMG.pages || {};
-  var U = TMG.ui, C = TMG.constants, Comp = TMG.compute;
+﻿/* Página: Dashboard */
+(function (TNE) {
+  TNE.pages = TNE.pages || {};
+  var U = TNE.ui, C = TNE.constants, Comp = TNE.compute;
   var state = { regiao: 'TODAS', prioridades: [] };
 
-  TMG.pages.dashboard = function (container, ctx) {
+  TNE.pages.dashboard = function (container, ctx) {
     var data = ctx.data, app = ctx.app;
-    if (!data) { container.appendChild(U.h('div', { class: 'tmg-card p-6', text: 'Sem dados carregados.' })); return; }
+    if (!data) { container.appendChild(U.h('div', { class: 'tne-card p-6', text: 'Sem dados carregados.' })); return; }
 
     // Calcula o dashboard. Se algo vier vazio/indefinido, usamos defaults
     // defensivos para nunca quebrar a renderização (ex.: kpis.foraSla).
@@ -21,7 +21,7 @@
     publicarSnapshotPublico(data);
 
     // ---- filtros + ações ----
-    var selReg = U.h('select', { class: 'tmg-select', style: { width: 'auto' }, onchange: function () { state.regiao = this.value; app.render(); } },
+    var selReg = U.h('select', { class: 'tne-select', style: { width: 'auto' }, onchange: function () { state.regiao = this.value; app.render(); } },
       [U.h('option', { value: 'TODAS', text: 'Todas as regiões' })].concat(C.REGIOES.map(function (r) {
         return U.h('option', { value: r, text: C.REGIAO_LABELS[r] || r, selected: f.regiao === r ? 'selected' : null });
       })));
@@ -29,12 +29,12 @@
       var wrap = U.h('div', { style: { display: 'flex', gap: '3px', flexWrap: 'wrap', alignItems: 'center' } });
       function mkChip(lbl, ativo, onclick) {
         return U.h('button', {
-          class: 'tmg-btn tmg-btn-ghost',
+          class: 'tne-btn tne-btn-ghost',
           style: {
             fontSize: '10px', padding: '2px 7px', borderRadius: '20px',
             background: ativo ? 'rgba(255,140,0,.25)' : 'rgba(255,255,255,.06)',
-            color: ativo ? 'var(--tmg-primary)' : 'var(--tmg-muted)',
-            border: '1px solid ' + (ativo ? 'var(--tmg-primary)' : 'rgba(255,255,255,.12)'),
+            color: ativo ? 'var(--tne-primary)' : 'var(--tne-muted)',
+            border: '1px solid ' + (ativo ? 'var(--tne-primary)' : 'rgba(255,255,255,.12)'),
             fontWeight: ativo ? '700' : '400', cursor: 'pointer'
           },
           text: lbl, onclick: onclick
@@ -54,9 +54,9 @@
       });
       return wrap;
     }());
-    var btnWa = U.h('button', { class: 'tmg-btn tmg-btn-ghost', text: '📱 Copiar resumo', onclick: function () { copiarResumo(d); } });
+    var btnWa = U.h('button', { class: 'tne-btn tne-btn-ghost', text: '📱 Copiar resumo', onclick: function () { copiarResumo(d); } });
     var btnExcel = U.h('button', {
-      class: 'tmg-btn clickable',
+      class: 'tne-btn clickable',
       style: { background: 'rgba(33,115,70,.18)', color: '#2e7d46', border: '1px solid rgba(33,115,70,.4)', fontWeight: '700', gap: '6px', transition: 'all .2s ease' },
       onclick: function () { exportarExcelDashboard(d, data); },
       onmouseenter: function (ev) { ev.currentTarget.style.background = 'rgba(33,115,70,.35)'; ev.currentTarget.style.borderColor = '#2e7d46'; ev.currentTarget.style.boxShadow = '0 4px 14px rgba(33,115,70,.3)'; },
@@ -70,20 +70,20 @@
       ]),
       U.h('span', { text: 'Extrair Excel' })
     ]);
-    var btnRef = U.h('button', { class: 'tmg-btn tmg-btn-primary', html: app.icon('refresh') + ' Atualizar', onclick: function () { app.refresh(); } });
+    var btnRef = U.h('button', { class: 'tne-btn tne-btn-primary', html: app.icon('refresh') + ' Atualizar', onclick: function () { app.refresh(); } });
     var right = U.h('div', { class: 'flex items-center gap-2 flex-wrap' }, [selReg, selPri, btnWa, btnExcel, btnRef]);
     var atualizadoEm = d.atualizadoEm ? new Date(d.atualizadoEm).toLocaleString('pt-BR') : new Date().toLocaleString('pt-BR');
     container.appendChild(U.pageHeader('Dashboard Operacional', 'Atualizado em ' + atualizadoEm, right));
 
     // ---- KPIs ----
     var kpiDefs = [
-      { label: 'Fora do SLA', value: U.fmtNum(K.foraSla), cor: C.CORES_TMG.red, spec: { tipo: 'foraSla' }, t: 'Backlog fora do SLA' },
-      { label: 'Backlog Total', value: U.fmtNum(K.backlogTotal), cor: C.CORES_TMG.orange, spec: { tipo: 'backlogTotal' }, t: 'Backlog total' },
-      { label: 'Backlog Indefinido', value: U.fmtNum(K.backlogIndef), cor: C.CORES_TMG.red, spec: { tipo: 'backlogIndef' }, t: 'Backlog sem SLA definido' },
-      { label: 'Preditiva', value: U.fmtNum(K.preditiva), cor: C.CORES_TMG.orange, spec: { tipo: 'preditiva' }, t: 'Atividades preditivas' },
-      { label: 'Produtividade (Concluídas)', value: U.fmtNum(K.produtividade), cor: C.CORES_TMG.green, spec: { tipo: 'produtividade' }, opts: { modoResultado: true }, t: 'TSKs concluídas' },
-      { label: 'SLA Geral (Concluídas)', value: U.fmtPct(K.slaGeral), cor: C.CORES_TMG.green, spec: { tipo: 'produtividade' }, opts: { modoResultado: true }, t: 'TSKs concluídas — % dentro do prazo' },
-      { label: 'GMG (Faturável)', value: U.fmtNum(K.gmg), cor: C.CORES_TMG.orange2, spec: { tipo: 'gmg' }, opts: { modoGmg: true }, t: 'Corretivas GMG no backlog (faturamento)' }
+      { label: 'Fora do SLA', value: U.fmtNum(K.foraSla), cor: C.CORES_TNE.red, spec: { tipo: 'foraSla' }, t: 'Backlog fora do SLA' },
+      { label: 'Backlog Total', value: U.fmtNum(K.backlogTotal), cor: C.CORES_TNE.orange, spec: { tipo: 'backlogTotal' }, t: 'Backlog total' },
+      { label: 'Backlog Indefinido', value: U.fmtNum(K.backlogIndef), cor: C.CORES_TNE.red, spec: { tipo: 'backlogIndef' }, t: 'Backlog sem SLA definido' },
+      { label: 'Preditiva', value: U.fmtNum(K.preditiva), cor: C.CORES_TNE.orange, spec: { tipo: 'preditiva' }, t: 'Atividades preditivas' },
+      { label: 'Produtividade (Concluídas)', value: U.fmtNum(K.produtividade), cor: C.CORES_TNE.green, spec: { tipo: 'produtividade' }, opts: { modoResultado: true }, t: 'TSKs concluídas' },
+      { label: 'SLA Geral (Concluídas)', value: U.fmtPct(K.slaGeral), cor: C.CORES_TNE.green, spec: { tipo: 'produtividade' }, opts: { modoResultado: true }, t: 'TSKs concluídas — % dentro do prazo' },
+      { label: 'GMG (Faturável)', value: U.fmtNum(K.gmg), cor: C.CORES_TNE.orange2, spec: { tipo: 'gmg' }, opts: { modoGmg: true }, t: 'Corretivas GMG no backlog (faturamento)' }
     ];
     var kpiGrid = U.h('div', { class: 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3 mb-5' }, kpiDefs.map(function (k) {
       return U.kpiCard({ label: k.label, value: k.value, cor: k.cor, onClick: k.spec ? function (kk) { return function () { app.openDrillTasks(kk.spec, f, kk.t, kk.opts || {}); }; }(k) : null });
@@ -246,7 +246,7 @@
       var regiaoEfetiva = regiaoFiltro || (state.regiao !== 'TODAS' ? state.regiao : null);
       var prioFiltros   = state.prioridades || [];
       // Dedup: um row por TSK (o mais recente), igual ao critério do gráfico
-      var _dedup = TMG.domain && TMG.domain.dedupPorTsk;
+      var _dedup = TNE.domain && TNE.domain.dedupPorTsk;
       var dedup = _dedup ? _dedup(data.tasksEnriched || []) : (data.tasksEnriched || []);
       var tasksVenc = dedup.filter(function(t){
         var s = (t.status||'').toString().trim().toUpperCase();
@@ -298,7 +298,7 @@
 
     // Prazos a Vencer — botão copiar (ao lado do título)
     var vencBtnCopiar = U.h('button', {
-      class: 'tmg-btn tmg-btn-ghost clickable',
+      class: 'tne-btn tne-btn-ghost clickable',
       style: { fontSize: '11px', padding: '2px 9px', display: 'inline-flex', alignItems: 'center', gap: '5px', border: '1px solid rgba(255,255,255,.15)' },
       onclick: function(){ copyText(gerarTextoPrazosTodasRegioes()); }
     }, [U.h('span',{text:'📋'}), U.h('span',{text:'Copiar'})]);
@@ -311,7 +311,7 @@
     var switchSf = U.switch(true, 'AGRUPAR POR END_ID', function(v){ sfAgrupar.value = v; });
 
     var btnCopiarTodosSF = U.h('button', {
-      class: 'tmg-btn tmg-btn-ghost clickable',
+      class: 'tne-btn tne-btn-ghost clickable',
       style: { fontSize: '11px', padding: '2px 9px', display: 'inline-flex', alignItems: 'center', gap: '5px', border: '1px solid rgba(255,255,255,.15)' },
       onclick: function(){ copyText(gerarTextoSitesFora(null)); }
     }, [U.h('span',{text:'📋'}), U.h('span',{text:'Copiar'})]);
@@ -339,7 +339,7 @@
       var onCopyDrill = function () { return gerarTextoPrazosRegiao(null, i); };
       app.openDrillTasks({ tipo: 'vencimento', arg: i }, f, 'A VENCER: ' + (bucket.label||''), {}, onCopyDrill);
     }});
-    U.barChart(sites.canvas, sfData.map(function (x) { return { label: x.label.toUpperCase(), total: x.total, cor: C.CORES_TMG.red }; }), {
+    U.barChart(sites.canvas, sfData.map(function (x) { return { label: x.label.toUpperCase(), total: x.total, cor: C.CORES_TNE.red }; }), {
       onBar: function (i) {
         var tipo = sfAgrupar.value ? 'sitesForaAgrupado' : 'sitesFora';
         var regiao = sfData[i].regiao;
@@ -422,30 +422,30 @@
       function tryLS(key) {
         try { return JSON.parse(localStorage.getItem(key) || 'null'); } catch(e){ return null; }
       }
-      var coordMapLS = tryLS('tmg_coordMap') || {};
+      var coordMapLS = tryLS('tne_coordMap') || {};
 
       // Se localStorage não tem coordMap (browser novo, cache limpo), buscar do servidor
-      if (!Object.keys(coordMapLS).length && TMG.api && TMG.api.getMapaCoords) {
+      if (!Object.keys(coordMapLS).length && TNE.api && TNE.api.getMapaCoords) {
         try {
-          var remoto = await TMG.api.getMapaCoords();
+          var remoto = await TNE.api.getMapaCoords();
           if (remoto && remoto.coords && Object.keys(remoto.coords).length) {
             coordMapLS = remoto.coords;
-            try { localStorage.setItem('tmg_coordMap', JSON.stringify(coordMapLS)); } catch(e){}
+            try { localStorage.setItem('tne_coordMap', JSON.stringify(coordMapLS)); } catch(e){}
           }
         } catch(e) {}
       }
       // Slim mwData: localStorage primeiro, fallback para cache em memória do mapa.js
-      var mwDataLS = tryLS('tmg_mwData') || (TMG._mwDataCache && TMG._mwDataCache.length ? TMG._mwDataCache : []);
+      var mwDataLS = tryLS('tne_mwData') || (TNE._mwDataCache && TNE._mwDataCache.length ? TNE._mwDataCache : []);
       var mwSlim = mwDataLS.length > 0 ? mwDataLS.map(function(l) {
         return { E2:l.Enlace2||'', LA:l.LAT_A, LO:l.LONG_A, LB:l.LAT_B, LOB:l.LONG_B, F:l.FORNECEDOR||'' };
       }) : null;
       // Slim foData: localStorage primeiro, fallback para cache em memória do mapa.js
-      var foDataLS = tryLS('tmg_foData') || (TMG._foDataCache && TMG._foDataCache.length ? TMG._foDataCache : []);
+      var foDataLS = tryLS('tne_foData') || (TNE._foDataCache && TNE._foDataCache.length ? TNE._foDataCache : []);
       var foSlim = foDataLS.length > 0 ? foDataLS.map(function(h) {
         return { N:h.NEName||'', H:h.HUB||'', LA:h.LAT_A, LO:h.LONG_A, F:h.FORNECEDOR||'' };
       }) : null;
 
-      var mapaMarkersLS = tryLS('tmg_mapaMarkers') || [];
+      var mapaMarkersLS = tryLS('tne_mapaMarkers') || [];
       console.log('[Dashboard] snapshot coords — coordMapLS:', Object.keys(coordMapLS).length,
                   'mapaMarkersLS:', mapaMarkersLS.length,
                   'mwLS:', mwDataLS.length, 'foLS:', foDataLS.length,
@@ -501,7 +501,7 @@
       var jsonStr = JSON.stringify(payload);
       if (jsonStr === _ultimoSnapshotJSON) return;
       _ultimoSnapshotJSON = jsonStr;
-      TMG.api.saveDashboardSnapshot(payload).catch(function () {});
+      TNE.api.saveDashboardSnapshot(payload).catch(function () {});
     } catch (e) { /* nunca deixa a publicação quebrar o Dashboard */ }
   }
 
@@ -532,10 +532,10 @@
     function mkBarRow(label, count, grandTotal, maxCount, onRowClick, onVerClick) {
       var pct = grandTotal > 0 ? Math.round(count / grandTotal * 100) : 0;
       var barW = maxCount > 0 ? (count / maxCount * 100) : 0;
-      var barra = U.h('div', { style: { width: barW + '%', height: '8px', borderRadius: '6px', background: 'var(--tmg-primary)', transition: 'width .3s ease, background .2s ease' } });
+      var barra = U.h('div', { style: { width: barW + '%', height: '8px', borderRadius: '6px', background: 'var(--tne-primary)', transition: 'width .3s ease, background .2s ease' } });
 
       var verBtn = U.h('button', {
-        class: 'tmg-btn tmg-btn-ghost',
+        class: 'tne-btn tne-btn-ghost',
         style: { fontSize: '10px', padding: '1px 7px', lineHeight: '1.4', flexShrink: '0', transition: 'all .15s ease' },
         text: 'ver casos',
         onclick: function (e) { e.stopPropagation(); onVerClick(); }
@@ -543,9 +543,9 @@
 
       var metaEl = U.h('div', { style: { display: 'flex', alignItems: 'center', gap: '6px', flexShrink: '0' } }, [
         verBtn,
-        U.h('span', { style: { color: 'var(--tmg-muted)', fontSize: '10px' }, text: pct + '%' }),
-        U.h('span', { style: { color: 'var(--tmg-primary)', fontWeight: '700', fontSize: '12px', minWidth: '22px', textAlign: 'right' }, text: String(count) }),
-        onRowClick ? U.h('span', { style: { color: 'var(--tmg-muted)', fontSize: '14px', marginLeft: '2px' }, text: '›' }) : U.h('span', { style: { width: '14px' } })
+        U.h('span', { style: { color: 'var(--tne-muted)', fontSize: '10px' }, text: pct + '%' }),
+        U.h('span', { style: { color: 'var(--tne-primary)', fontWeight: '700', fontSize: '12px', minWidth: '22px', textAlign: 'right' }, text: String(count) }),
+        onRowClick ? U.h('span', { style: { color: 'var(--tne-muted)', fontSize: '14px', marginLeft: '2px' }, text: '›' }) : U.h('span', { style: { width: '14px' } })
       ]);
 
       var row = U.h('div', {
@@ -562,8 +562,8 @@
       ]);
 
       if (onRowClick) {
-        row.addEventListener('mouseenter', function () { row.style.background = 'rgba(255,140,0,.08)'; barra.style.background = 'var(--tmg-primary2)'; barra.style.boxShadow = '0 0 8px rgba(255,140,0,.4)'; });
-        row.addEventListener('mouseleave', function () { row.style.background = ''; barra.style.background = 'var(--tmg-primary)'; barra.style.boxShadow = ''; });
+        row.addEventListener('mouseenter', function () { row.style.background = 'rgba(255,140,0,.08)'; barra.style.background = 'var(--tne-primary2)'; barra.style.boxShadow = '0 0 8px rgba(255,140,0,.4)'; });
+        row.addEventListener('mouseleave', function () { row.style.background = ''; barra.style.background = 'var(--tne-primary)'; barra.style.boxShadow = ''; });
         row.addEventListener('click', onRowClick);
       }
       return row;
@@ -589,22 +589,22 @@
           ));
         });
         if (!causas.length) {
-          barsWrap.appendChild(U.h('div', { style: { color: 'var(--tmg-muted)', fontSize: '12px', padding: '16px 0' }, text: 'Nenhum incidente ativo.' }));
+          barsWrap.appendChild(U.h('div', { style: { color: 'var(--tne-muted)', fontSize: '12px', padding: '16px 0' }, text: 'Nenhum incidente ativo.' }));
         }
       } else {
         var causaObj = causas.filter(function (c) { return c.causa === drillCausa; })[0];
 
         var voltarBtn = U.h('button', {
-          class: 'tmg-btn tmg-btn-ghost',
+          class: 'tne-btn tne-btn-ghost',
           style: { fontSize: '11px', padding: '2px 8px' },
           text: '← Voltar',
           onclick: function () { drillCausa = null; render(); }
         });
         headerEl.appendChild(voltarBtn);
-        headerEl.appendChild(U.h('span', { style: { color: 'var(--tmg-muted)', fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }, text: drillCausa }));
+        headerEl.appendChild(U.h('span', { style: { color: 'var(--tne-muted)', fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }, text: drillCausa }));
 
         if (!causaObj) {
-          barsWrap.appendChild(U.h('div', { style: { color: 'var(--tmg-muted)', fontSize: '12px' }, text: 'Sem dados.' }));
+          barsWrap.appendChild(U.h('div', { style: { color: 'var(--tne-muted)', fontSize: '12px' }, text: 'Sem dados.' }));
           return;
         }
 
@@ -626,23 +626,23 @@
     render();
 
     var totalCard = U.h('div', {
-      class: 'tmg-card p-5 flex flex-col items-center justify-center clickable',
+      class: 'tne-card p-5 flex flex-col items-center justify-center clickable',
       style: { minWidth: '180px', cursor: 'pointer', transition: 'box-shadow .15s, border-color .15s', border: '2px solid transparent' },
       title: 'Clique para ver todos os sites fora',
       onclick: function () { app.openDrillIncidents({ tipo: 'sitesFora', arg: null }, 'TODOS OS SITES FORA'); }
     }, [
-      U.h('div', { class: 'text-xs uppercase', style: { color: 'var(--tmg-muted)' }, text: 'TOTAL SITES FORA' }),
-      U.h('div', { class: 'font-extrabold', style: { fontSize: '56px', color: C.CORES_TMG.red, lineHeight: '1', textShadow: '0 0 20px rgba(231,76,60,.4)' }, text: U.fmtNum(tc.totalSitesFora) }),
-      U.h('div', { style: { fontSize: '10px', color: 'var(--tmg-muted)', marginTop: '4px' }, text: '▼ ver incidentes' })
+      U.h('div', { class: 'text-xs uppercase', style: { color: 'var(--tne-muted)' }, text: 'TOTAL SITES FORA' }),
+      U.h('div', { class: 'font-extrabold', style: { fontSize: '56px', color: C.CORES_TNE.red, lineHeight: '1', textShadow: '0 0 20px rgba(231,76,60,.4)' }, text: U.fmtNum(tc.totalSitesFora) }),
+      U.h('div', { style: { fontSize: '10px', color: 'var(--tne-muted)', marginTop: '4px' }, text: '▼ ver incidentes' })
     ]);
     totalCard.addEventListener('mouseenter', function () { totalCard.style.boxShadow = '0 0 20px rgba(231,76,60,.25)'; totalCard.style.borderColor = 'rgba(231,76,60,.5)'; });
     totalCard.addEventListener('mouseleave', function () { totalCard.style.boxShadow = ''; totalCard.style.borderColor = 'transparent'; });
 
-    return U.h('div', { class: 'tmg-card p-4' }, [
+    return U.h('div', { class: 'tne-card p-4' }, [
       U.h('div', { class: 'flex items-center gap-2 mb-3' }, [
-        U.h('span', { class: 'tmg-chart-dot' }),
+        U.h('span', { class: 'tne-chart-dot' }),
         U.h('h3', { class: 'text-sm font-bold', text: 'CAUSA / SUBCAUSA — SITES FORA' }),
-        U.h('span', { class: 'text-xs font-normal', style: { color: 'var(--tmg-muted)' }, text: '(clique em uma causa para ver subcausas · "ver casos" abre os incidentes)' })
+        U.h('span', { class: 'text-xs font-normal', style: { color: 'var(--tne-muted)' }, text: '(clique em uma causa para ver subcausas · "ver casos" abre os incidentes)' })
       ]),
       U.h('div', { class: 'grid grid-cols-1 lg:grid-cols-3 gap-4' }, [
         totalCard,
@@ -655,7 +655,7 @@
     var K = d.kpis || {};
     var tc = d.topCidades || {};
     var linhas = [
-      '*Controle TMG — Resumo*',
+      '*Controle TNE — Resumo*',
       'Fora do SLA: ' + (K.foraSla || 0),
       'Backlog Total: ' + (K.backlogTotal || 0),
       'Backlog Indef.: ' + (K.backlogIndef || 0),
@@ -676,7 +676,7 @@
   function exportarExcelDashboard(d, pageData) {
     if (typeof XLSX === 'undefined') { U.toast('Biblioteca de Excel não carregou. Recarregue a página.', 'err'); return; }
     var wb = XLSX.utils.book_new();
-    var dom = TMG.domain;
+    var dom = TNE.domain;
     var now = new Date();
 
     // Aplica formatação básica na aba: freeze do cabeçalho + larguras de coluna
@@ -807,9 +807,9 @@
     ], null);
 
     var ts = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
-    XLSX.writeFile(wb, 'Dashboard_TMG_' + ts + '.xlsx');
+    XLSX.writeFile(wb, 'Dashboard_tne_' + ts + '.xlsx');
     U.toast('Excel exportado com ' + (tasksE.length+incAtivos.length) + ' registros em ' + wb.SheetNames.length + ' abas!', 'ok');
   }
     if (typeof XLSX === 'undefined') { U.toast('Biblioteca de Excel não carregou. Recarregue a página.', 'err'); return; }
 
-})(window.TMG = window.TMG || {});
+})(window.TNE = window.TNE || {});

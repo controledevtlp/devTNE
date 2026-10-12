@@ -1,9 +1,9 @@
-/* ============================================================
+﻿/* ============================================================
  * Página: Pesquisa Operacional
  * ============================================================ */
-(function (TMG) {
-  TMG.pages = TMG.pages || {};
-  var U = TMG.ui, C = TMG.constants;
+(function (TNE) {
+  TNE.pages = TNE.pages || {};
+  var U = TNE.ui, C = TNE.constants;
 
   function norm(s) {
     if (!s) return '';
@@ -89,7 +89,7 @@
 
   function btnCopiar(getTexto) {
     return U.h('button', {
-      class:'tmg-btn tmg-btn-ghost clickable',
+      class:'tne-btn tne-btn-ghost clickable',
       style:{ fontSize:'12px', padding:'4px 12px', display:'inline-flex', alignItems:'center', gap:'5px', border:'1px solid rgba(255,255,255,.15)' },
       onclick: function() {
         var txt = getTexto();
@@ -103,11 +103,11 @@
     var u = norm(s);
     var cor = u==='INICIADO' ? '#2ecc71' : '#f0b429';
     var bg  = u==='INICIADO' ? 'rgba(46,204,113,.18)' : 'rgba(240,180,41,.22)';
-    return U.h('span',{class:'tmg-badge',style:{background:bg,color:cor,fontWeight:'700',fontSize:'10px'},text:s||'—'});
+    return U.h('span',{class:'tne-badge',style:{background:bg,color:cor,fontWeight:'700',fontSize:'10px'},text:s||'—'});
   }
 
   function vazio(msg) {
-    return U.h('p',{style:{color:'var(--tmg-muted)',fontSize:'13px',fontStyle:'italic',textAlign:'center',padding:'24px 0'},text: msg || 'Nenhum resultado.'});
+    return U.h('p',{style:{color:'var(--tne-muted)',fontSize:'13px',fontStyle:'italic',textAlign:'center',padding:'24px 0'},text: msg || 'Nenhum resultado.'});
   }
 
   function tabelaResultados(rows, colunas) {
@@ -119,7 +119,7 @@
         return U.h('td',{text: cel==null?'—':String(cel), style:{maxWidth:'200px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}});
       }));
     }));
-    return U.h('div',{style:{overflowX:'auto'}}, U.h('table',{class:'tmg-table'},[thead,tbody]));
+    return U.h('div',{style:{overflowX:'auto'}}, U.h('table',{class:'tne-table'},[thead,tbody]));
   }
 
   /* ── calcular status do update (usa a mesma lógica do dashboard) ── */
@@ -143,7 +143,7 @@
   /* ── filtros de região e prioridade (helper) ── */
   function mkFiltroSel(label, options) {
     var sel = U.h('select', {
-      class:'tmg-select',
+      class:'tne-select',
       style:{fontSize:'12px', padding:'3px 10px', minWidth:'130px'}
     }, options.map(function(o){ return U.h('option',{value:o.v,text:o.t}); }));
     return sel;
@@ -162,7 +162,7 @@
   /* ══════════════════════════════════════════════════════════════════
    * PÁGINA PRINCIPAL
    * ══════════════════════════════════════════════════════════════════ */
-  TMG.pages.pesquisa = function(container, ctx) {
+  TNE.pages.pesquisa = function(container, ctx) {
     var data  = ctx.data || {};
     var tasks = data.tasksEnriched || [];
     var incs  = data.incidentsEnriched || [];
@@ -188,18 +188,18 @@
     var tabRow = U.h('div', { style:{ display:'flex', gap:'8px', flexWrap:'wrap', marginBottom:'0' } });
     TABS.forEach(function(tab) {
       var btn = U.h('button', {
-        class:'tmg-btn clickable',
+        class:'tne-btn clickable',
         style:{ padding:'8px 18px', fontSize:'13px', fontWeight:'600',
-                borderRadius:'10px 10px 0 0', border:'1px solid var(--tmg-border)',
-                borderBottom:'none', background: tab.id===modoAtivo.v ? 'var(--tmg-card)' : 'var(--tmg-card2)',
-                color: tab.id===modoAtivo.v ? 'var(--tmg-primary)' : 'var(--tmg-muted)',
+                borderRadius:'10px 10px 0 0', border:'1px solid var(--tne-border)',
+                borderBottom:'none', background: tab.id===modoAtivo.v ? 'var(--tne-card)' : 'var(--tne-card2)',
+                color: tab.id===modoAtivo.v ? 'var(--tne-primary)' : 'var(--tne-muted)',
                 transition:'all .15s' },
         onclick: function() {
           modoAtivo.v = tab.id;
           Object.keys(tabBtns).forEach(function(id){
             var isA = id === tab.id;
-            tabBtns[id].style.background = isA ? 'var(--tmg-card)' : 'var(--tmg-card2)';
-            tabBtns[id].style.color      = isA ? 'var(--tmg-primary)' : 'var(--tmg-muted)';
+            tabBtns[id].style.background = isA ? 'var(--tne-card)' : 'var(--tne-card2)';
+            tabBtns[id].style.color      = isA ? 'var(--tne-primary)' : 'var(--tne-muted)';
           });
           renderModo();
         }
@@ -208,7 +208,7 @@
       tabRow.appendChild(btn);
     });
     container.appendChild(tabRow);
-    var card = U.h('div', { class:'tmg-card p-5', style:{ borderRadius:'0 10px 10px 10px' } });
+    var card = U.h('div', { class:'tne-card p-5', style:{ borderRadius:'0 10px 10px 10px' } });
     card.appendChild(tabContent);
     container.appendChild(card);
 
@@ -230,15 +230,15 @@
       var campoRow = U.h('div', { style:{ display:'flex', gap:'6px', flexWrap:'wrap', marginBottom:'10px' } });
       CAMPOS.forEach(function(c) {
         var b = U.h('button', {
-          class:'tmg-btn tmg-btn-ghost clickable',
+          class:'tne-btn tne-btn-ghost clickable',
           style:{ fontSize:'11px', padding:'3px 12px',
                   background: c.id===campoAtivo.v ? 'rgba(255,140,0,.18)' : '',
-                  borderColor: c.id===campoAtivo.v ? 'var(--tmg-primary)' : '' },
+                  borderColor: c.id===campoAtivo.v ? 'var(--tne-primary)' : '' },
           onclick: function() {
             campoAtivo.v = c.id;
             Object.keys(campoBtns).forEach(function(id){
               campoBtns[id].style.background   = id===c.id ? 'rgba(255,140,0,.18)' : '';
-              campoBtns[id].style.borderColor   = id===c.id ? 'var(--tmg-primary)' : '';
+              campoBtns[id].style.borderColor   = id===c.id ? 'var(--tne-primary)' : '';
             });
             buscar();
           }
@@ -249,7 +249,7 @@
       tabContent.appendChild(campoRow);
 
       var searchInput = U.h('input', {
-        class:'tmg-input',
+        class:'tne-input',
         placeholder:'Digite o valor para buscar...',
         style:{ fontSize:'13px', width:'100%', marginBottom:'10px' }
       });
@@ -298,7 +298,7 @@
      * ════════════════════════════════════════════════════════════ */
     function renderPendente() {
       tabContent.innerHTML = '';
-      var filtroUpd = U.h('select', { class:'tmg-select', style:{ fontSize:'12px', padding:'3px 10px', minWidth:'200px' } }, [
+      var filtroUpd = U.h('select', { class:'tne-select', style:{ fontSize:'12px', padding:'3px 10px', minWidth:'200px' } }, [
         U.h('option',{value:'sem', text:'Sem qualquer atualização'}),
         U.h('option',{value:'antigo', text:'Atualização não de hoje'}),
         U.h('option',{value:'todos', text:'Todas as abertas'}),
@@ -365,7 +365,7 @@
       var textoAtual = '';
       var ctrlRow = U.h('div', { style:{ display:'flex', gap:'8px', alignItems:'center', marginBottom:'12px', flexWrap:'wrap' } }, [
         selReg, selPrio, btnCopiar(function(){ return textoAtual; }),
-        U.h('span',{style:{fontSize:'11px',color:'var(--tmg-muted)',marginLeft:'6px'},text:'TSKs abertas cujo END_ID não está mais em sites fora ativos'})
+        U.h('span',{style:{fontSize:'11px',color:'var(--tne-muted)',marginLeft:'6px'},text:'TSKs abertas cujo END_ID não está mais em sites fora ativos'})
       ]);
       tabContent.appendChild(ctrlRow);
       tabContent.appendChild(resultArea);
@@ -422,7 +422,7 @@
           U.h('span',{style:{fontSize:'18px'},text:'✅'}),
           U.h('div',null,[
             U.h('b',{text:normalizados.length+' TSK(s) possivelmente normalizada(s)'}),
-            U.h('p',{style:{fontSize:'12px',color:'var(--tmg-muted)',margin:'3px 0 0'},text:'Site voltou (sem incidente ativo). Falha com keyword de alarme. DJ sem PREDITIVA/MABE/ACESSO FA.'})
+            U.h('p',{style:{fontSize:'12px',color:'var(--tne-muted)',margin:'3px 0 0'},text:'Site voltou (sem incidente ativo). Falha com keyword de alarme. DJ sem PREDITIVA/MABE/ACESSO FA.'})
           ])
         ]);
         resultArea.appendChild(aviso);
@@ -442,4 +442,4 @@
     renderModo();
   };
 
-})(window.TMG = window.TMG || {});
+})(window.TNE = window.TNE || {});

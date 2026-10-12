@@ -1,18 +1,18 @@
-/* =====================================================================
+﻿/* =====================================================================
  * produtividade.js — Aba de Produtividade Operacional
  * Encerramentos por dia (dentro/fora SLA, CCI vs Campo) + Reincidentes
  * Histórico persistido em localStorage + pasta "Produtividade" da conexão
  * ===================================================================== */
-(function (TMG) {
-  TMG.pages = TMG.pages || {};
-  var U    = TMG.ui;
-  var D    = TMG.domain;
-  var C    = TMG.constants;
-  var Comp = TMG.compute;
-  var FS   = TMG.files;
+(function (TNE) {
+  TNE.pages = TNE.pages || {};
+  var U    = TNE.ui;
+  var D    = TNE.domain;
+  var C    = TNE.constants;
+  var Comp = TNE.compute;
+  var FS   = TNE.files;
   var h    = U.h;
 
-  var LS_KEY = 'tmg_prod_hist_v1'; // localStorage key para histórico diário
+  var LS_KEY = 'tne_prod_hist_v1'; // localStorage key para histórico diário
   var _charts    = [];
   var _state     = { periodo: 30, regiao: 'TODAS', prioridade: 'TODAS' };
   var _diarioData = null;  // referência viva ao último computarDiarioP — usada nos drills
@@ -637,14 +637,14 @@
           var content = h('div', { style: { maxHeight: '65vh', overflowY: 'auto' } });
           osInBucket.sort(function (a, b) { return b.avgGapH - a.avgGapH; }).forEach(function (s) {
             var row = h('div', {
-              class: 'tmg-card p-3 mb-2',
+              class: 'tne-card p-3 mb-2',
               style: { display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' },
               onclick: function () { abrirTimeline(s); }
             }, [
               h('span', { style: { color: '#ff8c00', fontWeight: '700', fontSize: '12px', minWidth: '120px' }, text: s.task.osNumero || '—' }),
-              h('span', { style: { color: 'var(--tmg-muted)', fontSize: '11px', flex: '1' }, text: s.task.status || '—' }),
+              h('span', { style: { color: 'var(--tne-muted)', fontSize: '11px', flex: '1' }, text: s.task.status || '—' }),
               h('span', { style: { fontSize: '11px', color: bk.cor, fontWeight: '600', minWidth: '50px', textAlign: 'right' }, text: fmtGapP(s.avgGapH) }),
-              h('span', { style: { color: 'var(--tmg-muted)', fontSize: '11px' }, text: s.nEntries + ' entr.' })
+              h('span', { style: { color: 'var(--tne-muted)', fontSize: '11px' }, text: s.nEntries + ' entr.' })
             ]);
             row.addEventListener('mouseenter', function () { row.style.background = 'rgba(255,140,0,0.06)'; });
             row.addEventListener('mouseleave', function () { row.style.background = ''; });
@@ -698,15 +698,15 @@
           var content = h('div', { style: { maxHeight: '65vh', overflowY: 'auto' } });
           seg.statsArr.sort(function (a, b2) { return (b2.avgGapH || 0) - (a.avgGapH || 0); }).forEach(function (s) {
             var row = h('div', {
-              class: 'tmg-card p-3 mb-2',
+              class: 'tne-card p-3 mb-2',
               style: { display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' },
               onclick: function () { abrirTimeline(s); }
             }, [
               h('span', { style: { color: '#ff8c00', fontWeight: '700', fontSize: '12px', minWidth: '120px' }, text: s.task.osNumero || '—' }),
-              h('span', { style: { color: 'var(--tmg-muted)', fontSize: '11px', flex: '1' }, text: s.task.status || '—' }),
+              h('span', { style: { color: 'var(--tne-muted)', fontSize: '11px', flex: '1' }, text: s.task.status || '—' }),
               h('span', { style: { fontSize: '11px', color: seg.cor, fontWeight: '600', minWidth: '50px', textAlign: 'right' },
                 text: s.avgGapH != null ? fmtGapP(s.avgGapH) : '1 entr.' }),
-              h('span', { style: { color: 'var(--tmg-muted)', fontSize: '11px' }, text: s.nEntries + ' entr.' })
+              h('span', { style: { color: 'var(--tne-muted)', fontSize: '11px' }, text: s.nEntries + ' entr.' })
             ]);
             row.addEventListener('mouseenter', function () { row.style.background = 'rgba(255,140,0,0.06)'; });
             row.addEventListener('mouseleave', function () { row.style.background = ''; });
@@ -821,21 +821,21 @@
               return s.task.osNumero && (s.task.osNumero === it.task.osNumero);
             });
             content.appendChild(h('div', {
-              class: 'tmg-card p-3 mb-2',
+              class: 'tne-card p-3 mb-2',
               style: { borderLeft: '3px solid ' + (it.task.prioridade === 'P1' ? '#e74c3c' : '#ff8c00') }
             }, [
               h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' } }, [
                 h('span', { style: { color: '#ff8c00', fontWeight: '700', fontSize: '12px' }, text: it.task.osNumero || '—' }),
-                it.task.prioridade ? h('span', { class: 'tmg-badge', style: { background: 'rgba(231,76,60,.18)', color: '#e74c3c', fontSize: '11px' }, text: it.task.prioridade }) : null,
-                h('span', { style: { color: 'var(--tmg-muted)', fontSize: '11px', flex: '1' }, text: it.task.status || '—' }),
+                it.task.prioridade ? h('span', { class: 'tne-badge', style: { background: 'rgba(231,76,60,.18)', color: '#e74c3c', fontSize: '11px' }, text: it.task.prioridade }) : null,
+                h('span', { style: { color: 'var(--tne-muted)', fontSize: '11px', flex: '1' }, text: it.task.status || '—' }),
                 stat ? h('button', {
-                  class: 'tmg-btn tmg-btn-ghost',
+                  class: 'tne-btn tne-btn-ghost',
                   style: { fontSize: '10px', padding: '2px 8px' },
                   text: 'Timeline',
                   onclick: function () { abrirTimeline(stat); }
                 }) : null
               ]),
-              h('div', { style: { fontSize: '11px', color: 'var(--tmg-muted)' }, text:
+              h('div', { style: { fontSize: '11px', color: 'var(--tne-muted)' }, text:
                 'Encerrado: ' + fmtDia(it.prevTask ? toIsoDay(it.prevTask.fimCalc) : '?') +
                 '  →  Retornou em ' + it.gap + 'h' })
             ]));
@@ -933,7 +933,7 @@
           var tasks = tasksByHour[hr] || [];
           if (!tasks.length) { U.toast('Sem OSs com perda de prazo neste horário.', 'info'); return; }
           var content = h('div', { style: { maxHeight: '65vh', overflowY: 'auto' } });
-          content.appendChild(h('div', { style: { padding: '8px 12px 10px', fontSize: '12px', color: 'var(--tmg-muted)', borderBottom: '1px solid rgba(255,255,255,0.07)', marginBottom: '8px' } }, [
+          content.appendChild(h('div', { style: { padding: '8px 12px 10px', fontSize: '12px', color: 'var(--tne-muted)', borderBottom: '1px solid rgba(255,255,255,0.07)', marginBottom: '8px' } }, [
             h('span', { text: tasks.length + ' OS(s) com vencimento entre ' + ('0' + hr).slice(-2) + ':00 e ' + ('0' + hr).slice(-2) + ':59' })
           ]));
           tasks.forEach(function (t) {
@@ -941,16 +941,16 @@
             var isForaConcluida = isConcluida(t) && t.fimCalc && t.vencimentoCalc && toTs(t.fimCalc) > toTs(t.vencimentoCalc);
             var cor = isForaConcluida ? '#9aa5b1' : '#e74c3c';
             var row = h('div', {
-              class: 'tmg-card p-3 mb-2',
+              class: 'tne-card p-3 mb-2',
               style: { display: 'flex', alignItems: 'center', gap: '10px', cursor: stat ? 'pointer' : 'default' },
               onclick: stat ? function (s) { return function () { abrirTimeline(s); }; }(stat) : null
             }, [
               h('span', { style: { color: '#ff8c00', fontWeight: '700', fontSize: '12px', minWidth: '120px' }, text: t.osNumero || '—' }),
-              h('span', { style: { color: 'var(--tmg-muted)', fontSize: '11px', flex: '1' }, text: t.status || '—' }),
-              t.prioridade ? h('span', { class: 'tmg-badge', style: { background: 'rgba(231,76,60,.15)', color: cor, fontSize: '10px' }, text: t.prioridade }) : null,
+              h('span', { style: { color: 'var(--tne-muted)', fontSize: '11px', flex: '1' }, text: t.status || '—' }),
+              t.prioridade ? h('span', { class: 'tne-badge', style: { background: 'rgba(231,76,60,.15)', color: cor, fontSize: '10px' }, text: t.prioridade }) : null,
               h('span', { style: { fontSize: '11px', color: cor, fontWeight: '600', whiteSpace: 'nowrap' },
                 text: isForaConcluida ? 'Concluída fora' : 'Ativa fora' }),
-              stat ? h('span', { style: { color: 'var(--tmg-muted)', fontSize: '12px', paddingLeft: '4px' }, text: '›' }) : null
+              stat ? h('span', { style: { color: 'var(--tne-muted)', fontSize: '12px', paddingLeft: '4px' }, text: '›' }) : null
             ]);
             if (stat) {
               row.addEventListener('mouseenter', function () { row.style.background = 'rgba(255,140,0,0.06)'; });
@@ -974,21 +974,21 @@
     var entries = stat.entries;
     var wrap = h('div', { style: { maxHeight: '68vh', overflowY: 'auto', padding: '6px 4px' } });
 
-    wrap.appendChild(h('div', { class: 'tmg-card p-3 mb-4', style: { display: 'flex', gap: '24px', flexWrap: 'wrap', fontSize: '12px' } }, [
+    wrap.appendChild(h('div', { class: 'tne-card p-3 mb-4', style: { display: 'flex', gap: '24px', flexWrap: 'wrap', fontSize: '12px' } }, [
       h('div', {}, [
-        h('div', { style: { color: 'var(--tmg-muted)', fontSize: '11px' }, text: 'ENTRADAS' }),
+        h('div', { style: { color: 'var(--tne-muted)', fontSize: '11px' }, text: 'ENTRADAS' }),
         h('div', { style: { fontWeight: '700', fontSize: '14px' }, text: String(entries.length) })
       ]),
       h('div', {}, [
-        h('div', { style: { color: 'var(--tmg-muted)', fontSize: '11px' }, text: 'INTERVALO MÉDIO' }),
+        h('div', { style: { color: 'var(--tne-muted)', fontSize: '11px' }, text: 'INTERVALO MÉDIO' }),
         h('div', { style: { fontWeight: '700', fontSize: '14px' }, text: stat.avgGapH != null ? fmtGapP(stat.avgGapH) : '—' })
       ]),
       h('div', {}, [
-        h('div', { style: { color: 'var(--tmg-muted)', fontSize: '11px' }, text: 'ÚLTIMA ATUALIZ.' }),
+        h('div', { style: { color: 'var(--tne-muted)', fontSize: '11px' }, text: 'ÚLTIMA ATUALIZ.' }),
         h('div', { style: { fontWeight: '700', fontSize: '14px' }, text: fmtDDMMP(stat.lastDt) + ' ' + fmtHMP(stat.lastDt) })
       ]),
       h('div', {}, [
-        h('div', { style: { color: 'var(--tmg-muted)', fontSize: '11px' }, text: 'STATUS' }),
+        h('div', { style: { color: 'var(--tne-muted)', fontSize: '11px' }, text: 'STATUS' }),
         h('div', { style: { fontWeight: '700', fontSize: '14px' }, text: stat.task.status || '—' })
       ])
     ]));
@@ -999,7 +999,7 @@
       var dotCor = isLast ? '#ff8c00' : isFirst ? '#2ecc71' : '#3498db';
 
       if (gapH !== null && gapH >= 0 && gapH < 720) {
-        var gapCor = gapH > 8 ? '#e74c3c' : gapH > 4 ? '#f39c12' : 'var(--tmg-muted)';
+        var gapCor = gapH > 8 ? '#e74c3c' : gapH > 4 ? '#f39c12' : 'var(--tne-muted)';
         wrap.appendChild(h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '3px 0 3px 18px' } }, [
           h('div', { style: { width: '2px', height: '18px', background: 'rgba(255,140,0,0.25)', marginLeft: '5px' } }),
           h('span', { style: { color: gapCor, fontSize: '11px', marginLeft: '10px', fontWeight: gapH > 4 ? '600' : '400' }, text: '+ ' + fmtGapP(gapH) })
@@ -1013,12 +1013,12 @@
         h('div', { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: '0' } }, [
           h('div', { style: { width: '11px', height: '11px', borderRadius: '50%', background: dotCor, marginTop: '4px', flexShrink: '0', boxShadow: '0 0 0 2px ' + dotCor + '30' } })
         ]),
-        h('div', { class: 'tmg-card p-3', style: { flex: '1', fontSize: '12px', marginBottom: '0' } }, [
+        h('div', { class: 'tne-card p-3', style: { flex: '1', fontSize: '12px', marginBottom: '0' } }, [
           h('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: '5px', gap: '8px', flexWrap: 'wrap' } }, [
             h('span', { style: { color: dotCor, fontWeight: '700' }, text: fmtDDMMP(entry.dt) + ' ' + fmtHMP(entry.dt) }),
-            h('span', { style: { color: 'var(--tmg-muted)', fontSize: '11px', textAlign: 'right' }, text: entry.author })
+            h('span', { style: { color: 'var(--tne-muted)', fontSize: '11px', textAlign: 'right' }, text: entry.author })
           ]),
-          h('div', { style: { color: 'var(--tmg-fg)', lineHeight: '1.55', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }, text: preview })
+          h('div', { style: { color: 'var(--tne-fg)', lineHeight: '1.55', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }, text: preview })
         ])
       ]));
     });
@@ -1040,7 +1040,7 @@
     }, []);
 
     if (statsComDiario.length) {
-      content.appendChild(h('div', { style: { padding: '12px 0 6px', fontSize: '12px', color: 'var(--tmg-muted)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' },
+      content.appendChild(h('div', { style: { padding: '12px 0 6px', fontSize: '12px', color: 'var(--tne-muted)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' },
         text: 'Timelines de Atualização (' + statsComDiario.length + ')' }));
       statsComDiario.forEach(function (stat) {
         var row = h('div', {
@@ -1049,9 +1049,9 @@
           onclick: function () { abrirTimeline(stat); }
         }, [
           h('span', { style: { color: '#ff8c00', fontWeight: '700', fontSize: '12px', minWidth: '120px' }, text: stat.task.osNumero || '—' }),
-          h('span', { style: { color: 'var(--tmg-muted)', fontSize: '11px', flex: '1' }, text: stat.nEntries + ' entradas · última: ' + fmtDDMMP(stat.lastDt) + ' ' + fmtHMP(stat.lastDt) }),
+          h('span', { style: { color: 'var(--tne-muted)', fontSize: '11px', flex: '1' }, text: stat.nEntries + ' entradas · última: ' + fmtDDMMP(stat.lastDt) + ' ' + fmtHMP(stat.lastDt) }),
           h('button', {
-            class: 'tmg-btn tmg-btn-ghost',
+            class: 'tne-btn tne-btn-ghost',
             style: { fontSize: '10px', padding: '2px 8px', flexShrink: '0' },
             text: 'Ver timeline',
             onclick: function (e) { e.stopPropagation(); abrirTimeline(stat); }
@@ -1077,20 +1077,20 @@
         return s.task.osNumero && (s.task.osNumero === it.task.osNumero || s.task.osNumero === (it.prevTask && it.prevTask.osNumero));
       });
       content.appendChild(h('div', {
-        class: 'tmg-card p-3 mb-2',
+        class: 'tne-card p-3 mb-2',
         style: { borderLeft: '3px solid #ff8c00' }
       }, [
         h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', flexWrap: 'wrap' } }, [
           h('span', { class: 'font-bold text-sm', text: 'END_ID: ' + it.eid }),
-          it.task.prioridade ? h('span', { class: 'tmg-badge', style: { background: 'rgba(231,76,60,.18)', color: '#e74c3c', fontSize: '11px' }, text: it.task.prioridade }) : null,
+          it.task.prioridade ? h('span', { class: 'tne-badge', style: { background: 'rgba(231,76,60,.18)', color: '#e74c3c', fontSize: '11px' }, text: it.task.prioridade }) : null,
           stat ? h('button', {
-            class: 'tmg-btn tmg-btn-ghost',
+            class: 'tne-btn tne-btn-ghost',
             style: { fontSize: '10px', padding: '2px 8px', marginLeft: 'auto' },
             text: 'Ver timeline',
             onclick: function () { abrirTimeline(stat); }
           }) : null
         ]),
-        h('div', { style: { fontSize: '12px', color: 'var(--tmg-muted)', lineHeight: '1.7' } }, [
+        h('div', { style: { fontSize: '12px', color: 'var(--tne-muted)', lineHeight: '1.7' } }, [
           h('div', { text: 'Encerrado: ' + fmtDia(it.prevTask ? toIsoDay(it.prevTask.fimCalc) : '?') + '  (OS: ' + (it.prevTask && it.prevTask.osNumero || '—') + ')' }),
           h('div', { text: 'Reincidência: ' + fmtDia(toIsoDay(it.task.fimCalc || it.task.createdAt)) + '  (OS: ' + (it.task.osNumero || '—') + ')  — gap: ' + it.gap + 'h desde o encerramento anterior' })
         ])
@@ -1147,13 +1147,13 @@
     saveHist(merged);
 
     // Tentar sincronizar com o GAS se disponível
-    if (TMG.api && TMG.api.saveProdutividadeHist) {
+    if (TNE.api && TNE.api.saveProdutividadeHist) {
       try {
         log('Sincronizando com o banco de dados...');
         var gasRows = Object.keys(hist).map(function (d) {
           return Object.assign({ data: d }, hist[d]);
         });
-        await TMG.api.saveProdutividadeHist(gasRows);
+        await TNE.api.saveProdutividadeHist(gasRows);
       } catch (e) { /* GAS indisponível: dados ficam no localStorage */ }
     }
 
@@ -1161,15 +1161,15 @@
   }
 
   // ── Render ────────────────────────────────────────────────────────
-  TMG.pages.produtividade = function (container, ctx) {
+  TNE.pages.produtividade = function (container, ctx) {
     var data = ctx && ctx.data;
     destroyLocalCharts();
 
     if (!data || !(data.tasksEnriched || []).length) {
-      container.appendChild(h('div', { class: 'tmg-card p-8 text-center' }, [
+      container.appendChild(h('div', { class: 'tne-card p-8 text-center' }, [
         h('div', { style: { fontSize: '2.4rem', marginBottom: '12px' }, text: '📭' }),
         h('div', { class: 'font-bold mb-2 text-base', text: 'Nenhum dado carregado' }),
-        h('div', { style: { color: 'var(--tmg-muted)', fontSize: '13px' },
+        h('div', { style: { color: 'var(--tne-muted)', fontSize: '13px' },
           text: 'Importe a planilha de tarefas pela aba "Importar dados" para visualizar a produtividade.' })
       ]));
       return;
@@ -1180,7 +1180,7 @@
     // Cabeçalho
     container.appendChild(U.pageHeader
       ? U.pageHeader('Produtividade Operacional', 'Encerramentos e reincidências por período')
-      : h('div', { class: 'mb-4' }, [h('h1', { class: 'tmg-heading text-xl font-bold', text: 'Produtividade Operacional' })])
+      : h('div', { class: 'mb-4' }, [h('h1', { class: 'tne-heading text-xl font-bold', text: 'Produtividade Operacional' })])
     );
 
     var areaEl = h('div', {});
@@ -1207,7 +1207,7 @@
       var periodos = [{ l: '7d', v: 7 }, { l: '15d', v: 15 }, { l: '30d', v: 30 }, { l: 'Todos', v: 0 }];
       var btnsPeriodo = periodos.map(function (p) {
         return h('button', {
-          class: 'tmg-btn ' + (_state.periodo === p.v ? 'tmg-btn-primary' : 'tmg-btn-ghost'),
+          class: 'tne-btn ' + (_state.periodo === p.v ? 'tne-btn-primary' : 'tne-btn-ghost'),
           style: { fontSize: '12px', padding: '4px 12px' },
           text: p.l,
           onclick: function () { _state.periodo = p.v; render(); }
@@ -1216,15 +1216,15 @@
 
       // Botão processar histórico
       var btnProcessar = h('button', {
-        class: 'tmg-btn tmg-btn-ghost',
+        class: 'tne-btn tne-btn-ghost',
         style: { fontSize: '12px', padding: '4px 14px', color: '#ff8c00', borderColor: 'rgba(255,140,0,0.5)' },
         text: hasHist ? '🔄 Reprocessar Histórico' : '📁 Processar Histórico',
         onclick: function () { abrirModalProcessar(ctx, render); }
       });
 
       var btnLimpar = hasHist ? h('button', {
-        class: 'tmg-btn tmg-btn-ghost',
-        style: { fontSize: '11px', padding: '3px 10px', color: 'var(--tmg-muted)' },
+        class: 'tne-btn tne-btn-ghost',
+        style: { fontSize: '11px', padding: '3px 10px', color: 'var(--tne-muted)' },
         text: '🗑 Limpar Histórico',
         onclick: function () { clearHist(); render(); }
       }) : null;
@@ -1234,7 +1234,7 @@
       var regioes = ['TODAS'].concat(C.REGIOES || []);
       var btnsRegiao = regioes.map(function (r) {
         return h('button', {
-          class: 'tmg-btn ' + (_state.regiao === r ? 'tmg-btn-primary' : 'tmg-btn-ghost'),
+          class: 'tne-btn ' + (_state.regiao === r ? 'tne-btn-primary' : 'tne-btn-ghost'),
           style: { fontSize: '11px', padding: '3px 10px' },
           text: r === 'TODAS' ? 'Todas' : r,
           onclick: function () { _state.regiao = r; render(); }
@@ -1244,7 +1244,7 @@
       var prios = ['TODAS', 'P1', 'P2', 'P3', 'P4', 'P5', 'PREDITIVA'];
       var btnsPrio = prios.map(function (p) {
         return h('button', {
-          class: 'tmg-btn ' + (_state.prioridade === p ? 'tmg-btn-primary' : 'tmg-btn-ghost'),
+          class: 'tne-btn ' + (_state.prioridade === p ? 'tne-btn-primary' : 'tne-btn-ghost'),
           style: { fontSize: '11px', padding: '3px 10px' },
           text: p === 'TODAS' ? 'Todas' : p,
           onclick: function () { _state.prioridade = p; render(); }
@@ -1252,21 +1252,21 @@
       });
 
       var row1Items = [
-        h('span', { style: { color: 'var(--tmg-muted)', fontSize: '12px', fontWeight: '600' }, text: 'PERÍODO:' }),
+        h('span', { style: { color: 'var(--tne-muted)', fontSize: '12px', fontWeight: '600' }, text: 'PERÍODO:' }),
         h('div', { class: 'flex gap-2' }, btnsPeriodo),
         sep(),
         btnProcessar,
         btnLimpar
       ].filter(Boolean);
       var row2Items = [
-        h('span', { style: { color: 'var(--tmg-muted)', fontSize: '12px', fontWeight: '600' }, text: 'REGIÃO:' }),
+        h('span', { style: { color: 'var(--tne-muted)', fontSize: '12px', fontWeight: '600' }, text: 'REGIÃO:' }),
         h('div', { class: 'flex gap-2 flex-wrap' }, btnsRegiao),
         sep(),
-        h('span', { style: { color: 'var(--tmg-muted)', fontSize: '12px', fontWeight: '600' }, text: 'PRIORIDADE:' }),
+        h('span', { style: { color: 'var(--tne-muted)', fontSize: '12px', fontWeight: '600' }, text: 'PRIORIDADE:' }),
         h('div', { class: 'flex gap-2 flex-wrap' }, btnsPrio)
       ];
       areaEl.appendChild(h('div', {
-        class: 'tmg-card p-3 mb-5',
+        class: 'tne-card p-3 mb-5',
         style: { borderColor: 'rgba(255,140,0,0.2)' }
       }, [
         h('div', { class: 'flex items-center gap-3 flex-wrap mb-2' }, row1Items),
@@ -1352,21 +1352,21 @@
         blocoTotals.sort(function (a, b) { return b.count - a.count; });
         var hrPico = '', hrPicoCount = 0;
         hrTotais.forEach(function (c, hr) { if (c > hrPicoCount) { hrPicoCount = c; hrPico = hr + 'h'; } });
-        var textCard = h('div', { class: 'tmg-card p-4 mb-4', style: { borderLeft: '3px solid #e67e22' } }, [
+        var textCard = h('div', { class: 'tne-card p-4 mb-4', style: { borderLeft: '3px solid #e67e22' } }, [
           h('div', { style: { fontWeight: '700', fontSize: '12px', color: '#e67e22', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' },
             text: 'Análise de perdas — ' + _state.prioridade }),
-          h('div', { style: { fontSize: '13px', color: 'var(--tmg-fg)', lineHeight: '2', display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: '2px 24px' } },
+          h('div', { style: { fontSize: '13px', color: 'var(--tne-fg)', lineHeight: '2', display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: '2px 24px' } },
             blocoTotals.map(function (b, i) {
               var pct = (b.count / perdaData.total * 100).toFixed(0);
-              var cor = i === 0 ? '#e74c3c' : i === 1 ? '#ff8c00' : 'var(--tmg-muted)';
+              var cor = i === 0 ? '#e74c3c' : i === 1 ? '#ff8c00' : 'var(--tne-muted)';
               return h('div', { style: { color: cor } },
                 [h('span', { style: { fontWeight: i === 0 ? '700' : '400' }, text: b.label + ':  ' }),
                  h('span', { style: { fontWeight: '700' }, text: pct + '%' }),
-                 h('span', { style: { color: 'var(--tmg-muted)', fontSize: '11px' }, text: '  (' + b.count + ')' })
+                 h('span', { style: { color: 'var(--tne-muted)', fontSize: '11px' }, text: '  (' + b.count + ')' })
                 ]);
             })
           ),
-          hrPicoCount > 0 ? h('div', { style: { marginTop: '8px', fontSize: '12px', color: 'var(--tmg-muted)' },
+          hrPicoCount > 0 ? h('div', { style: { marginTop: '8px', fontSize: '12px', color: 'var(--tne-muted)' },
             text: 'Pico pontual às ' + hrPico + ' (' + hrPicoCount + ' perda' + (hrPicoCount !== 1 ? 's' : '') + ' nesse horário).' }) : null
         ]);
         areaEl.appendChild(textCard);
@@ -1452,10 +1452,10 @@
       var mediaDia        = diasComReinci > 0 ? (totReinci / diasComReinci).toFixed(1) : '0';
 
       if (totReinci === 0) {
-        areaEl.appendChild(h('div', { class: 'tmg-card p-6 mb-5 text-center', style: { border: '1.5px solid rgba(46,204,113,0.35)' } }, [
+        areaEl.appendChild(h('div', { class: 'tne-card p-6 mb-5 text-center', style: { border: '1.5px solid rgba(46,204,113,0.35)' } }, [
           h('div', { style: { fontSize: '28px', marginBottom: '6px' }, text: '✅' }),
           h('div', { style: { fontWeight: '700', fontSize: '16px', color: '#2ecc71', marginBottom: '4px' }, text: 'Sem reincidências no período' }),
-          h('div', { style: { fontSize: '13px', color: 'var(--tmg-muted)' }, text: 'Nenhum END_ID retornou com nova OS em até 72h dentro dos filtros selecionados.' })
+          h('div', { style: { fontSize: '13px', color: 'var(--tne-muted)' }, text: 'Nenhum END_ID retornou com nova OS em até 72h dentro dos filtros selecionados.' })
         ]));
       } else {
         areaEl.appendChild(h('div', { class: 'grid gap-3 mb-4', style: { gridTemplateColumns: 'repeat(4,1fr)' } }, [
@@ -1541,25 +1541,25 @@
     ]));
 
     panel.appendChild(h('div', {
-      class: 'tmg-card p-6 text-center',
+      class: 'tne-card p-6 text-center',
       style: { borderColor: 'rgba(255,140,0,0.3)', borderStyle: 'dashed' }
     }, [
       h('div', { style: { fontSize: '2.5rem', marginBottom: '12px' }, text: '📂' }),
       h('div', { class: 'font-bold text-base mb-2', text: 'Sem histórico de produtividade' }),
-      h('div', { style: { color: 'var(--tmg-muted)', fontSize: '13px', maxWidth: '480px', margin: '0 auto 20px' },
-        text: 'Para gerar os gráficos históricos, coloque os arquivos "Atividades-TMG_FMMT" anteriores ' +
+      h('div', { style: { color: 'var(--tne-muted)', fontSize: '13px', maxWidth: '480px', margin: '0 auto 20px' },
+        text: 'Para gerar os gráficos históricos, coloque os arquivos "Atividades-tne_FMMT" anteriores ' +
               'na subpasta "Produtividade" dentro da pasta conectada e clique em processar.' }),
-      h('div', { class: 'tmg-card p-3 mb-5 text-left', style: { maxWidth: '420px', margin: '0 auto 20px', fontSize: '12px', color: 'var(--tmg-muted)' } }, [
-        h('div', { class: 'font-bold mb-2', style: { color: 'var(--tmg-fg)' }, text: '📁 Estrutura esperada:' }),
+      h('div', { class: 'tne-card p-3 mb-5 text-left', style: { maxWidth: '420px', margin: '0 auto 20px', fontSize: '12px', color: 'var(--tne-muted)' } }, [
+        h('div', { class: 'font-bold mb-2', style: { color: 'var(--tne-fg)' }, text: '📁 Estrutura esperada:' }),
         h('div', { text: 'Pasta conectada/' }),
-        h('div', { style: { paddingLeft: '16px' }, text: '├ Atividades-TMG_FMMT_hoje.xlsx' }),
+        h('div', { style: { paddingLeft: '16px' }, text: '├ Atividades-tne_FMMT_hoje.xlsx' }),
         h('div', { style: { paddingLeft: '16px' }, text: '└ Produtividade/' }),
-        h('div', { style: { paddingLeft: '32px' }, text: '├ Atividades-TMG_FMMT_2026-07-01.xlsx' }),
-        h('div', { style: { paddingLeft: '32px' }, text: '├ Atividades-TMG_FMMT_2026-07-02.xlsx' }),
+        h('div', { style: { paddingLeft: '32px' }, text: '├ Atividades-tne_FMMT_2026-07-01.xlsx' }),
+        h('div', { style: { paddingLeft: '32px' }, text: '├ Atividades-tne_FMMT_2026-07-02.xlsx' }),
         h('div', { style: { paddingLeft: '32px' }, text: '└ ...' })
       ]),
       h('button', {
-        class: 'tmg-btn tmg-btn-primary',
+        class: 'tne-btn tne-btn-primary',
         style: { padding: '10px 28px', fontSize: '14px' },
         text: '📁 Processar Histórico da pasta "Produtividade"',
         onclick: function () { abrirModalProcessar(ctx, onDone); }
@@ -1570,9 +1570,9 @@
 
   // ── Modal: processamento de histórico ──────────────────────────────
   function abrirModalProcessar(ctx, onDone) {
-    var progressEl = h('div', { style: { color: 'var(--tmg-muted)', fontSize: '13px', minHeight: '24px' }, text: 'Aguardando...' });
+    var progressEl = h('div', { style: { color: 'var(--tne-muted)', fontSize: '13px', minHeight: '24px' }, text: 'Aguardando...' });
     var btnStart = h('button', {
-      class: 'tmg-btn tmg-btn-primary',
+      class: 'tne-btn tne-btn-primary',
       style: { padding: '8px 24px' },
       text: 'Iniciar Processamento'
     });
@@ -1580,7 +1580,7 @@
     var okEl    = h('div', { style: { color: '#2ecc71', fontSize: '13px', marginTop: '8px' } });
 
     var content = h('div', {}, [
-      h('div', { style: { color: 'var(--tmg-muted)', fontSize: '13px', marginBottom: '16px' },
+      h('div', { style: { color: 'var(--tne-muted)', fontSize: '13px', marginBottom: '16px' },
         text: 'Todos os arquivos .xlsx dentro da subpasta "Produtividade" da pasta conectada ' +
               'serão lidos, processados e as métricas salvas para análise histórica.' }),
       progressEl, errEl, okEl,
@@ -1604,7 +1604,7 @@
         btnStart.disabled = false;
         btnStart.textContent = 'Fechar e ver gráficos';
         btnStart.onclick = function () {
-          var ov = document.querySelector('.tmg-modal-overlay');
+          var ov = document.querySelector('.tne-modal-overlay');
           if (ov) ov.click();
         };
       } catch (e) {
@@ -1624,4 +1624,4 @@
     ]);
   }
 
-})(window.TMG = window.TMG || {});
+})(window.TNE = window.TNE || {});

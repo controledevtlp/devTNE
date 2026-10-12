@@ -1,14 +1,14 @@
-/* =====================================================================
+﻿/* =====================================================================
  * ui.js  —  COMPONENTES DE INTERFACE (helpers reutilizáveis)
  * ---------------------------------------------------------------------
  * Funções para montar a tela: sidebar, cartões de KPI, gráficos
  * (Chart.js), modal de detalhamento (drill), avisos (toast), etc.
  * Tudo gera elementos no DOM — sem frameworks.
  * ===================================================================== */
-(function (TMG) {
+(function (TNE) {
   var U = {};
-  var C = TMG.constants;
-  var D = TMG.domain;
+  var C = TNE.constants;
+  var D = TNE.domain;
 
   // ---------- hyperscript: cria elemento DOM ----------
   function h(tag, attrs, children) {
@@ -62,27 +62,27 @@
 
   // ---------- toast ----------
   function ensureToasts() {
-    var t = document.getElementById('tmg-toasts');
-    if (!t) { t = h('div', { id: 'tmg-toasts' }); document.body.appendChild(t); }
+    var t = document.getElementById('tne-toasts');
+    if (!t) { t = h('div', { id: 'tne-toasts' }); document.body.appendChild(t); }
     return t;
   }
   U.toast = function (msg, type) {
     var box = ensureToasts();
-    var el = h('div', { class: 'tmg-toast ' + (type || 'info'), text: msg });
+    var el = h('div', { class: 'tne-toast ' + (type || 'info'), text: msg });
     box.appendChild(el);
     setTimeout(function () { el.style.opacity = '0'; el.style.transition = 'opacity .3s'; setTimeout(function () { el.remove(); }, 320); }, 3600);
   };
 
   // ---------- loading (com mensagem opcional de etapa) ----------
   function ensureLoading() {
-    var l = document.getElementById('tmg-loading');
+    var l = document.getElementById('tne-loading');
     if (!l) {
-      l = h('div', { id: 'tmg-loading' }, [
-        h('div', { class: 'tmg-spin' }),
-        h('div', { id: 'tmg-loading-msg', style: { color: 'var(--tmg-fg)', fontSize: '13px', marginTop: '12px', fontWeight: '600' } }),
-        h('div', { id: 'tmg-loading-sub', style: { color: 'var(--tmg-muted)', fontSize: '11px', marginTop: '4px' } }),
+      l = h('div', { id: 'tne-loading' }, [
+        h('div', { class: 'tne-spin' }),
+        h('div', { id: 'tne-loading-msg', style: { color: 'var(--tne-fg)', fontSize: '13px', marginTop: '12px', fontWeight: '600' } }),
+        h('div', { id: 'tne-loading-sub', style: { color: 'var(--tne-muted)', fontSize: '11px', marginTop: '4px' } }),
         h('div', { style: { width: '180px', height: '3px', background: 'rgba(255,255,255,.1)', borderRadius: '4px', marginTop: '14px', overflow: 'hidden' } }, [
-          h('div', { id: 'tmg-loading-bar', style: { height: '3px', borderRadius: '4px', background: 'var(--tmg-primary)', width: '0%', transition: 'width .4s ease' } })
+          h('div', { id: 'tne-loading-bar', style: { height: '3px', borderRadius: '4px', background: 'var(--tne-primary)', width: '0%', transition: 'width .4s ease' } })
         ])
       ]);
       document.body.appendChild(l);
@@ -91,28 +91,28 @@
   }
   U.loading = function (show, msg) {
     ensureLoading().classList.toggle('show', !!show);
-    var m = document.getElementById('tmg-loading-msg');
+    var m = document.getElementById('tne-loading-msg');
     if (m) m.textContent = msg || '';
     if (!show) {
-      var bar = document.getElementById('tmg-loading-bar');
+      var bar = document.getElementById('tne-loading-bar');
       if (bar) bar.style.width = '0%';
-      var sub = document.getElementById('tmg-loading-sub');
+      var sub = document.getElementById('tne-loading-sub');
       if (sub) sub.textContent = '';
     }
   };
   U.loadingMsg = function (msg, pct) {
     ensureLoading().classList.add('show');
-    var m = document.getElementById('tmg-loading-msg');
+    var m = document.getElementById('tne-loading-msg');
     if (m) m.textContent = msg || '';
-    var bar = document.getElementById('tmg-loading-bar');
+    var bar = document.getElementById('tne-loading-bar');
     if (bar) bar.style.width = (pct || 0) + '%';
-    var sub = document.getElementById('tmg-loading-sub');
+    var sub = document.getElementById('tne-loading-sub');
     if (sub) sub.textContent = pct != null ? pct + '%' : '';
   };
 
   // ---------- modal ----------
   U.closeModal = function () {
-    var m = document.getElementById('tmg-modal-host');
+    var m = document.getElementById('tne-modal-host');
     if (m) m.remove();
   };
   U.openModal = function (title, contentEl, opts) {
@@ -122,32 +122,32 @@
     var headRight = [];
     if (opts.onCopy) {
       headRight.push(h('button', {
-        class: 'tmg-btn tmg-btn-ghost', text: '📋 Copiar', title: 'Copiar este detalhamento em texto (formato WhatsApp)',
+        class: 'tne-btn tne-btn-ghost', text: '📋 Copiar', title: 'Copiar este detalhamento em texto (formato WhatsApp)',
         onclick: function () { U.copyText(opts.onCopy(), 'Detalhamento copiado!'); }
       }));
     }
-    headRight.push(h('button', { class: 'tmg-btn tmg-btn-ghost', text: '✕ Fechar', onclick: U.closeModal }));
-    var head = h('div', { class: 'flex items-center justify-between px-5 py-3 flex-wrap gap-2', style: { borderBottom: '1px solid var(--tmg-border)' } }, [
-      h('h3', { class: 'text-base font-bold', style: { color: 'var(--tmg-primary)' }, text: title }),
+    headRight.push(h('button', { class: 'tne-btn tne-btn-ghost', text: '✕ Fechar', onclick: U.closeModal }));
+    var head = h('div', { class: 'flex items-center justify-between px-5 py-3 flex-wrap gap-2', style: { borderBottom: '1px solid var(--tne-border)' } }, [
+      h('h3', { class: 'text-base font-bold', style: { color: 'var(--tne-primary)' }, text: title }),
       h('div', { class: 'flex items-center gap-2' }, headRight)
     ]);
-    var modal = h('div', { class: 'tmg-modal' }, [head, body]);
-    if (opts.footer) modal.appendChild(h('div', { class: 'px-5 py-3', style: { borderTop: '1px solid var(--tmg-border)' } }, opts.footer));
-    var bg = h('div', { class: 'tmg-modal-bg', id: 'tmg-modal-host', onclick: function (ev) { if (ev.target === bg) U.closeModal(); } }, modal);
+    var modal = h('div', { class: 'tne-modal' }, [head, body]);
+    if (opts.footer) modal.appendChild(h('div', { class: 'px-5 py-3', style: { borderTop: '1px solid var(--tne-border)' } }, opts.footer));
+    var bg = h('div', { class: 'tne-modal-bg', id: 'tne-modal-host', onclick: function (ev) { if (ev.target === bg) U.closeModal(); } }, modal);
     document.body.appendChild(bg);
   };
   // fecha o modal com ESC, sem precisar clicar em "Fechar" (registrado uma única vez)
   if (!U._escWired) {
     U._escWired = true;
     document.addEventListener('keydown', function (ev) {
-      if (ev.key === 'Escape' && document.getElementById('tmg-modal-host')) U.closeModal();
+      if (ev.key === 'Escape' && document.getElementById('tne-modal-host')) U.closeModal();
     });
   }
 
   // ---------- KPI card ----------
   // Mesma assinatura de sempre: { label, value, sub?, cor?, onClick? }
   // Visual: barra de destaque no topo + brilho no canto + glow no valor,
-  // tudo na cor "cor" (ou laranja padrão), com elevação no hover (via CSS .tmg-kpi).
+  // tudo na cor "cor" (ou laranja padrão), com elevação no hover (via CSS .tne-kpi).
   U.kpiCard = function (o) {
     var corHex = /^#/.test(o.cor || '') ? o.cor : '#ff8c00';
     var accent = h('div', { style: { position: 'absolute', top: '0', left: '0', right: '0', height: '3px', background: corHex } });
@@ -155,11 +155,11 @@
       position: 'absolute', bottom: '-22px', right: '-22px', width: '90px', height: '90px', borderRadius: '50%',
       background: 'radial-gradient(circle, ' + hexToRgba(corHex, .16) + ', transparent)', pointerEvents: 'none'
     } });
-    var card = h('div', { class: 'tmg-card tmg-kpi p-4 flex flex-col gap-1', style: { position: 'relative' } }, [
+    var card = h('div', { class: 'tne-card tne-kpi p-4 flex flex-col gap-1', style: { position: 'relative' } }, [
       accent, glow,
-      h('div', { class: 'text-xs font-semibold uppercase tracking-wide', style: { color: 'var(--tmg-muted)', letterSpacing: '1px' }, text: o.label }),
-      h('div', { class: 'text-3xl font-extrabold', style: { color: o.cor || 'var(--tmg-fg)', textShadow: '0 0 18px ' + hexToRgba(corHex, .3) }, text: o.value }),
-      o.sub ? h('div', { class: 'text-xs', style: { color: 'var(--tmg-muted)' }, text: o.sub }) : null
+      h('div', { class: 'text-xs font-semibold uppercase tracking-wide', style: { color: 'var(--tne-muted)', letterSpacing: '1px' }, text: o.label }),
+      h('div', { class: 'text-3xl font-extrabold', style: { color: o.cor || 'var(--tne-fg)', textShadow: '0 0 18px ' + hexToRgba(corHex, .3) }, text: o.value }),
+      o.sub ? h('div', { class: 'text-xs', style: { color: 'var(--tne-muted)' }, text: o.sub }) : null
     ]);
     if (o.onClick) card.addEventListener('click', o.onClick);
     else card.style.cursor = 'default';
@@ -169,16 +169,16 @@
   // ---------- Barra de resumo (total em destaque + lista lateral) ----------
   // items: [{ nome, valor, pct? }]
   U.resumoBar = function (totalLabel, totalValor, items) {
-    return h('div', { class: 'tmg-resumo-bar' }, [
-      h('div', { class: 'tmg-resumo-total' }, [
-        h('span', { class: 'tmg-resumo-total-label', text: totalLabel }),
-        h('span', { class: 'tmg-resumo-total-valor', text: String(totalValor) })
+    return h('div', { class: 'tne-resumo-bar' }, [
+      h('div', { class: 'tne-resumo-total' }, [
+        h('span', { class: 'tne-resumo-total-label', text: totalLabel }),
+        h('span', { class: 'tne-resumo-total-valor', text: String(totalValor) })
       ]),
-      h('div', { class: 'tmg-resumo-grid' }, (items || []).map(function (it) {
-        return h('div', { class: 'tmg-resumo-item' }, [
-          h('span', { class: 'tmg-resumo-nome', text: it.nome }),
-          h('span', { class: 'tmg-resumo-val', text: String(it.valor) }),
-          it.pct != null ? h('span', { class: 'tmg-resumo-pct', text: it.pct }) : null
+      h('div', { class: 'tne-resumo-grid' }, (items || []).map(function (it) {
+        return h('div', { class: 'tne-resumo-item' }, [
+          h('span', { class: 'tne-resumo-nome', text: it.nome }),
+          h('span', { class: 'tne-resumo-val', text: String(it.valor) }),
+          it.pct != null ? h('span', { class: 'tne-resumo-pct', text: it.pct }) : null
         ]);
       }))
     ]);
@@ -187,7 +187,7 @@
   // ---------- Caixa de busca (debounce simples) ----------
   U.searchInput = function (placeholder, onChange, opts) {
     opts = opts || {};
-    var inp = h('input', { type: 'text', class: 'tmg-input', placeholder: placeholder, value: opts.value || '' });
+    var inp = h('input', { type: 'text', class: 'tne-input', placeholder: placeholder, value: opts.value || '' });
     var t = null;
     inp.addEventListener('input', function () {
       clearTimeout(t);
@@ -199,13 +199,13 @@
   // ---------- Switch (toggle bonito, com hover/glow) ----------
   // U.switch(checked, label, onChange) — onChange recebe o novo boolean.
   U.switch = function (checked, label, onChange) {
-    var input = h('input', { type: 'checkbox', class: 'tmg-switch-input', checked: checked ? 'checked' : null });
+    var input = h('input', { type: 'checkbox', class: 'tne-switch-input', checked: checked ? 'checked' : null });
     input.checked = !!checked; // garante o estado real do DOM, não só o atributo inicial
     input.addEventListener('change', function () { onChange(input.checked); });
-    return h('label', { class: 'tmg-switch-wrap' }, [
+    return h('label', { class: 'tne-switch-wrap' }, [
       input,
-      h('span', { class: 'tmg-switch-track' }, h('span', { class: 'tmg-switch-thumb' })),
-      label ? h('span', { class: 'tmg-switch-label', text: label }) : null
+      h('span', { class: 'tne-switch-track' }, h('span', { class: 'tne-switch-thumb' })),
+      label ? h('span', { class: 'tne-switch-label', text: label }) : null
     ]);
   };
 
@@ -222,16 +222,16 @@
       }
     });
     var statusPill = h('div', {
-      class: 'tmg-badge', style: {
+      class: 'tne-badge', style: {
         background: opts.statusOk ? 'rgba(46,204,113,.12)' : 'rgba(255,255,255,.05)',
-        color: opts.statusOk ? 'var(--tmg-green)' : 'var(--tmg-muted)',
+        color: opts.statusOk ? 'var(--tne-green)' : 'var(--tne-muted)',
         fontFamily: 'ui-monospace, monospace', padding: '6px 12px', marginTop: '4px'
       }, text: opts.statusText || 'Aguardando arquivo...'
     });
-    var dz = h('div', { class: 'tmg-dropzone' }, [
-      h('div', { class: 'tmg-dropzone-icon', text: opts.icon || '📁' }),
-      h('div', { class: 'tmg-dropzone-title', text: opts.title || 'Arraste o arquivo aqui' }),
-      h('div', { class: 'tmg-dropzone-sub', html: opts.sub || 'ou clique para selecionar' }),
+    var dz = h('div', { class: 'tne-dropzone' }, [
+      h('div', { class: 'tne-dropzone-icon', text: opts.icon || '📁' }),
+      h('div', { class: 'tne-dropzone-title', text: opts.title || 'Arraste o arquivo aqui' }),
+      h('div', { class: 'tne-dropzone-sub', html: opts.sub || 'ou clique para selecionar' }),
       statusPill,
       fileInput
     ]);
@@ -269,7 +269,7 @@
     if (opts.hint) {
       // hint pode ser string ou elemento DOM (ex.: um U.switch)
       if (typeof opts.hint === 'string') {
-        rightBits.push(h('span', { class: 'text-xs', style: { color: 'var(--tmg-muted)' }, text: opts.hint }));
+        rightBits.push(h('span', { class: 'text-xs', style: { color: 'var(--tne-muted)' }, text: opts.hint }));
       } else if (opts.hint && opts.hint.nodeType) {
         rightBits.push(opts.hint);
       }
@@ -277,19 +277,19 @@
     if (opts.rightEl && opts.rightEl.nodeType) rightBits.push(opts.rightEl);
     if (opts.onCopy) {
       rightBits.push(h('button', {
-        class: 'tmg-btn tmg-btn-ghost', title: 'Copiar dados em texto',
+        class: 'tne-btn tne-btn-ghost', title: 'Copiar dados em texto',
         style: { padding: '3px 9px', fontSize: '12px' }, text: '📋',
         onclick: function () { U.copyText(opts.onCopy(), 'Dados copiados!'); }
       }));
     }
     var head = h('div', { class: 'flex items-center justify-between mb-3' }, [
       h('h3', { class: 'text-sm font-bold flex items-center gap-2' }, [
-        h('span', { class: 'tmg-chart-dot' }),
+        h('span', { class: 'tne-chart-dot' }),
         h('span', { text: title })
       ]),
       rightBits.length ? h('div', { class: 'flex items-center gap-2' }, rightBits) : null
     ]);
-    var card = h('div', { class: 'tmg-card tmg-chart-card p-4' }, [head, wrap]);
+    var card = h('div', { class: 'tne-card tne-chart-card p-4' }, [head, wrap]);
     return { card: card, canvas: canvas };
   };
 
@@ -341,7 +341,7 @@
   U.barChart = function (canvas, data, opts) {
     opts = opts || {};
     var datasets = [{ data: data.map(function (d) { return d.total; }),
-      backgroundColor: data.map(function (d) { return d.cor || C.CORES_TMG.orange; }),
+      backgroundColor: data.map(function (d) { return d.cor || C.CORES_TNE.orange; }),
       borderRadius: 6, maxBarThickness: 46 }];
     return register(new Chart(canvas, {
       type: 'bar',
@@ -354,7 +354,7 @@
   U.hbarChart = function (canvas, data, opts) {
     opts = opts || {};
     var datasets = [{ data: data.map(function (d) { return d.total; }),
-      backgroundColor: data.map(function (d) { return d.cor || C.CORES_TMG.orange; }),
+      backgroundColor: data.map(function (d) { return d.cor || C.CORES_TNE.orange; }),
       borderRadius: 6, maxBarThickness: 34 }];
     return register(new Chart(canvas, {
       type: 'bar',
@@ -372,10 +372,10 @@
     if (opts.onSeg) o.onClick = function (ev, els) { if (els && els.length) opts.onSeg(els[0].index, els[0].datasetIndex); };
     var temPreditiva = data.some(function (d) { return d.preditiva != null && d.preditiva > 0; });
     var datasets = [
-      { label: opts.l1 || 'Dentro', data: data.map(function (d) { return d.dentro; }), backgroundColor: C.CORES_TMG.green, borderRadius: 4, maxBarThickness: 46 },
-      { label: opts.l2 || 'Fora', data: data.map(function (d) { return d.fora; }), backgroundColor: C.CORES_TMG.red, borderRadius: 4, maxBarThickness: 46 }
+      { label: opts.l1 || 'Dentro', data: data.map(function (d) { return d.dentro; }), backgroundColor: C.CORES_TNE.green, borderRadius: 4, maxBarThickness: 46 },
+      { label: opts.l2 || 'Fora', data: data.map(function (d) { return d.fora; }), backgroundColor: C.CORES_TNE.red, borderRadius: 4, maxBarThickness: 46 }
     ];
-    if (temPreditiva) datasets.push({ label: opts.l3 || 'Preditiva', data: data.map(function (d) { return d.preditiva || 0; }), backgroundColor: C.CORES_TMG.orange, borderRadius: 4, maxBarThickness: 46 });
+    if (temPreditiva) datasets.push({ label: opts.l3 || 'Preditiva', data: data.map(function (d) { return d.preditiva || 0; }), backgroundColor: C.CORES_TNE.orange, borderRadius: 4, maxBarThickness: 46 });
     return register(new Chart(canvas, {
       type: 'bar',
       data: { labels: data.map(function (d) { return d.label; }), datasets: hoverDatasets(datasets) },
@@ -446,14 +446,14 @@
     else if (s === 'DENTRO DO SLA') { cor = '#2ecc71'; bg = 'rgba(46,204,113,.15)'; }
     else if (s === 'PREDITIVA') { cor = '#ff8c00'; bg = 'rgba(255,140,0,.15)'; }
     else if (s === 'CONCLUIDO') { cor = '#3498db'; bg = 'rgba(52,152,219,.15)'; }
-    return h('span', { class: 'tmg-badge', style: { color: cor, background: bg }, text: statusSla || '—' });
+    return h('span', { class: 'tne-badge', style: { color: cor, background: bg }, text: statusSla || '—' });
   };
   U.tratBadge = function (st) {
     var s = (st || 'ATIVO').toUpperCase();
     var cor = '#e74c3c', bg = 'rgba(231,76,60,.15)';
     if (s === 'RESOLVIDO') { cor = '#2ecc71'; bg = 'rgba(46,204,113,.15)'; }
     else if (s === 'EM TRATAMENTO') { cor = '#ff8c00'; bg = 'rgba(255,140,0,.15)'; }
-    return h('span', { class: 'tmg-badge', style: { color: cor, background: bg }, text: st || 'ATIVO' });
+    return h('span', { class: 'tne-badge', style: { color: cor, background: bg }, text: st || 'ATIVO' });
   };
 
   // ---------- TSK aberta (cruza END_ID do incidente GENESIS com a fila de tarefas/TOA) ----------
@@ -522,8 +522,8 @@
   U.tskCell = function (incident, tasksEnriched) {
     var m = tskAberta(incident, tasksEnriched);
     if (!m) {
-      return h('span', { class: 'tmg-badge', style: { background: 'rgba(231,76,60,.16)', color: '#ff6b6b', fontWeight: '700' } }, [
-        h('span', { class: 'tmg-pulse-dot', style: { marginRight: '5px', verticalAlign: 'middle' } }),
+      return h('span', { class: 'tne-badge', style: { background: 'rgba(231,76,60,.16)', color: '#ff6b6b', fontWeight: '700' } }, [
+        h('span', { class: 'tne-pulse-dot', style: { marginRight: '5px', verticalAlign: 'middle' } }),
         h('span', { text: 'SEM TSK' })
       ]);
     }
@@ -533,7 +533,7 @@
     else if (st === 'NÃO INICIADO' || st === 'NAO INICIADO') { cor = '#9a7d00'; bg = 'rgba(241,196,15,.35)'; }
     var texto = (m.osNumero || '—') + (m.total > 1 ? ' (+' + (m.total - 1) + ')' : '');
     var tooltip = (m.status || '') + (m.filaAtual ? '\n' + m.filaAtual : '');
-    return h('span', { class: 'tmg-badge', style: { background: bg, color: cor, fontWeight: '700', cursor: 'help' }, title: tooltip }, texto);
+    return h('span', { class: 'tne-badge', style: { background: bg, color: cor, fontWeight: '700', cursor: 'help' }, title: tooltip }, texto);
   };
 
   // Padrões de anotações automáticas do sistema (bot) — ignoradas ao extrair o último update manual.
@@ -589,13 +589,13 @@
   // ---------- Badge visual de vencimento (backlog aberto: "VENCE EM / VENCIDO A") ----------
   U.vencimentoBadge = function (vencimentoCalc) {
     var venc = D.formatarVencimentoSimples(vencimentoCalc);
-    if (!venc.cor) return h('span', { style: { color: 'var(--tmg-muted)' }, text: '—' });
+    if (!venc.cor) return h('span', { style: { color: 'var(--tne-muted)' }, text: '—' });
     var bg = venc.venceu ? 'rgba(231,76,60,.16)' : 'rgba(46,204,113,.16)';
     var icone = venc.venceu ? '⚠️' : '⏱';
     var bits = [h('span', { text: icone }), h('span', { text: venc.texto })];
-    if (venc.venceu) bits.unshift(h('span', { class: 'tmg-pulse-dot' }));
+    if (venc.venceu) bits.unshift(h('span', { class: 'tne-pulse-dot' }));
     return h('span', {
-      class: 'tmg-badge', style: { background: bg, color: venc.cor, fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '5px' }
+      class: 'tne-badge', style: { background: bg, color: venc.cor, fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '5px' }
     }, bits);
   };
 
@@ -608,11 +608,11 @@
     var motivo = (t.motivoCancelamento || '').toString().toUpperCase();
     var ehAssoc = motivo.indexOf('ASSOCIA') >= 0;
     if (ehAssoc) {
-      return h('span', { class: 'tmg-badge', style: { background: 'rgba(52,152,219,.16)', color: '#3498db', fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '5px' } }, [
+      return h('span', { class: 'tne-badge', style: { background: 'rgba(52,152,219,.16)', color: '#3498db', fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '5px' } }, [
         h('span', { text: '🔗' }), h('span', { text: 'Associação' })
       ]);
     }
-    return h('span', { class: 'tmg-badge', style: { background: 'rgba(155,89,182,.16)', color: '#9b59b6', fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '5px' } }, [
+    return h('span', { class: 'tne-badge', style: { background: 'rgba(155,89,182,.16)', color: '#9b59b6', fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '5px' } }, [
       h('span', { text: '⚡' }), h('span', { text: 'Automação' })
     ]);
   };
@@ -620,14 +620,14 @@
   // ---------- Badge de Resultado SLA (somente para CONCLUÍDAS) ----------
   // Compara fimCalc (hora real de encerramento) com vencimentoCalc (prazo).
   U.resultadoSlaBadge = function (t) {
-    if (!t.fimCalc || !t.vencimentoCalc) return h('span', { style: { color: 'var(--tmg-muted)' }, text: '—' });
+    if (!t.fimCalc || !t.vencimentoCalc) return h('span', { style: { color: 'var(--tne-muted)' }, text: '—' });
     var dentroSla = new Date(t.fimCalc).getTime() <= new Date(t.vencimentoCalc).getTime();
     if (dentroSla) {
-      return h('span', { class: 'tmg-badge', style: { background: 'rgba(46,204,113,.16)', color: '#2ecc71', fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '5px' } }, [
+      return h('span', { class: 'tne-badge', style: { background: 'rgba(46,204,113,.16)', color: '#2ecc71', fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '5px' } }, [
         h('span', { text: '✅' }), h('span', { text: 'Dentro SLA' })
       ]);
     }
-    return h('span', { class: 'tmg-badge', style: { background: 'rgba(231,76,60,.16)', color: '#e74c3c', fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '5px' } }, [
+    return h('span', { class: 'tne-badge', style: { background: 'rgba(231,76,60,.16)', color: '#e74c3c', fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '5px' } }, [
       h('span', { text: '❌' }), h('span', { text: 'Fora SLA' })
     ]);
   };
@@ -667,7 +667,7 @@
         h('td', null, lastCell)
       ]);
     });
-    var tbl = h('table', { class: 'tmg-table' }, [thead, h('tbody', null, body)]);
+    var tbl = h('table', { class: 'tne-table' }, [thead, h('tbody', null, body)]);
     return wrapTable(tbl, rows.length);
   };
 
@@ -757,15 +757,15 @@
                                     (stTsk === 'INICIADO' || stTsk === 'NÃO INICIADO' || stTsk === 'NAO INICIADO'));
           function atualizarBadge() {
             if (!precisaAtualizar) return null;
-            return h('span', { class: 'tmg-badge', style: { color: 'var(--tmg-primary)', background: 'rgba(255,140,0,.2)', fontSize: '10px', fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '3px' } },
-              [h('span', { class: 'tmg-pulse-dot' }), h('span', { text: 'ATUALIZAR GENESIS' })]);
+            return h('span', { class: 'tne-badge', style: { color: 'var(--tne-primary)', background: 'rgba(255,140,0,.2)', fontSize: '10px', fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '3px' } },
+              [h('span', { class: 'tne-pulse-dot' }), h('span', { text: 'ATUALIZAR GENESIS' })]);
           }
           function timeBadge() {
             if (!elapsed) return null;
             var bits = [];
-            if (elapsed.min >= 60) bits.push(h('span', { class: 'tmg-pulse-dot', style: { marginRight: '3px' } }));
+            if (elapsed.min >= 60) bits.push(h('span', { class: 'tne-pulse-dot', style: { marginRight: '3px' } }));
             bits.push(h('span', { text: 'há ' + elapsed.texto }));
-            return h('span', { class: 'tmg-badge', style: { color: elapsed.cor, background: elapsed.bg, fontSize: '10px', fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '2px', marginTop: '2px' } }, bits);
+            return h('span', { class: 'tne-badge', style: { color: elapsed.cor, background: elapsed.bg, fontSize: '10px', fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '2px', marginTop: '2px' } }, bits);
           }
           function buildCel(mainEl) {
             var parts = [atualizarBadge(), mainEl, timeBadge()].filter(Boolean);
@@ -773,7 +773,7 @@
               h('span', { style: { display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'flex-start' } }, parts);
           }
           if (!textoDetalhe || textoDetalhe === '#') {
-            return buildCel(h('span', { style: { color: 'var(--tmg-muted)', fontStyle: 'italic', fontSize: '11px' }, text: 'SEM INFO' }));
+            return buildCel(h('span', { style: { color: 'var(--tne-muted)', fontStyle: 'italic', fontSize: '11px' }, text: 'SEM INFO' }));
           }
           var resumo = textoDetalhe.replace(/\n+/g, ' ').slice(0, 38) + (textoDetalhe.length > 38 ? '…' : '');
           var cel = h('span', {
@@ -789,7 +789,7 @@
         }())
       ]);
     });
-    var tbl = h('table', { class: 'tmg-table' }, [thead, h('tbody', null, body)]);
+    var tbl = h('table', { class: 'tne-table' }, [thead, h('tbody', null, body)]);
     return wrapTable(tbl, rows.length);
   };
 
@@ -880,7 +880,7 @@
 
   function wrapTable(tbl, n) {
     return h('div', null, [
-      h('div', { class: 'text-xs mb-2', style: { color: 'var(--tmg-muted)' }, text: fmtNum(n) + ' registro(s)' + (n > 1000 ? ' (exibindo 1000)' : '') }),
+      h('div', { class: 'text-xs mb-2', style: { color: 'var(--tne-muted)' }, text: fmtNum(n) + ' registro(s)' + (n > 1000 ? ' (exibindo 1000)' : '') }),
       h('div', { style: { maxHeight: '64vh', overflow: 'auto' } }, tbl)
     ]);
   }
@@ -891,18 +891,18 @@
   U.pageHeader = function (title, subtitle, right, opts) {
     opts = opts || {};
     var logoSize = opts.compact ? '30px' : '42px';
-    var logo = h('img', { src: 'assets/logo-tmg.png', alt: '', class: 'tmg-logo-hover', style: { width: logoSize, height: logoSize, objectFit: 'contain', flexShrink: '0' } });
-    var tituloEl = h('h1', { class: 'tmg-heading font-extrabold flex items-center gap-2', style: { fontSize: opts.compact ? '17px' : '26px' } }, [logo, h('span', { text: title })]);
+    var logo = h('img', { src: 'assets/logo-tne.png', alt: '', class: 'tne-logo-hover', style: { width: logoSize, height: logoSize, objectFit: 'contain', flexShrink: '0' } });
+    var tituloEl = h('h1', { class: 'tne-heading font-extrabold flex items-center gap-2', style: { fontSize: opts.compact ? '17px' : '26px' } }, [logo, h('span', { text: title })]);
     return h('div', { class: 'flex items-end justify-between flex-wrap gap-3', style: { marginBottom: opts.compact ? '10px' : '20px' } }, [
       h('div', null, [
         tituloEl,
-        subtitle ? h('p', { class: 'text-sm mt-1', style: { color: 'var(--tmg-muted)' }, text: subtitle }) : null
+        subtitle ? h('p', { class: 'text-sm mt-1', style: { color: 'var(--tne-muted)' }, text: subtitle }) : null
       ]),
       right || null
     ]);
   };
 
-  TMG.ui = U;
+  TNE.ui = U;
   // ---------- Rodapé "Equipe de Desenvolvimento" ----------
   // Reaproveitado tanto no painel principal (app.js) quanto no dashboard
   // público (dashboard-publico.html), pra manter o crédito sempre visível.
@@ -924,7 +924,9 @@
   var FRASES_PADRAO_BOT_PARCIAIS = [
     // "Circuito RJO60014894:\nNão foi identificado massiva no provedor VTAL..."
     // O número do circuito varia, então checamos só a parte constante.
-    'NÃO FOI IDENTIFICADO MASSIVA NO PROVEDOR VTAL E NÃO FOI IDENTIFICADO FALHA DE INFRA/ENERGIA'
+    'NÃO FOI IDENTIFICADO MASSIVA NO PROVEDOR VTAL E NÃO FOI IDENTIFICADO FALHA DE INFRA/ENERGIA',
+    'TRAMITAÇÃO OU SUSPENSÃO:',
+    'NOME DA OPERADORA/PARCEIRA:'
   ];
 
   // Corresponde a IsTextoSemAtualizacao do VBA
@@ -943,6 +945,8 @@
     if (t.indexOf('ALTERAÇÃO NO ENVIO') >= 0 && t.indexOf('JUSTIFICATIVA DA SELEÇÃO') >= 0 && t.indexOf('DATA DE ATIVAÇÃO DO GERADOR') >= 0) {
       if (t.indexOf('ATUALIZAÇÃO GMG') < 0) return true;
     }
+    // Retorno automático por alarme (API Netcool) — não é atualização humana
+    if (t.indexOf('MODO DE VALIDAÇÃO') >= 0 && t.indexOf('API NETCOOL') >= 0) return true;
     return false;
   }
 
@@ -986,6 +990,14 @@
   var BG_TIMESTAMP_RE = /(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}\s+\d{1,2}:\d{2}(?::\d{2})?|\d{4}[\/\-]\d{2}[\/\-]\d{2}\s+\d{1,2}:\d{2}(?::\d{2})?|\d{1,2}[\/\-]\d{1,2}\s+\d{1,2}:\d{2}(?::\d{2})?|\d{1,2}:\d{2}(?::\d{2})?)/g;
   U.BG_TIMESTAMP_RE = BG_TIMESTAMP_RE;
   U.classificarUltimoBloco = classificarUltimoBloco;
+
+  // Conta quantas vezes a TSK retornou automaticamente por alarme presente (API Netcool).
+  U.contarRetornosAlarme = function (bg) {
+    if (!bg) return 0;
+    var re = /TENTATIVA\s+\d+\s*[–\-]\s*MODO DE VALIDA[ÇC][AÃ]O/gi;
+    var m = (bg || '').match(re);
+    return m ? m.length : 0;
+  };
 
   // Extrai TODOS os timestamps do texto BG e retorna o bloco (timestamp + texto seguinte)
   // cuja data seja a MAIS RECENTE — igual ao ExtrairUltimaDataHora + UltimaMensagem do VBA.
@@ -1038,6 +1050,12 @@
       if (!nome || RE_BOT_UI.test(nome)) continue;
       var p2 = m[1].trim().match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})(?::(\d{2}))?$/);
       if (!p2) continue;
+      // Descarta entradas cujo conteúdo imediato é formulário de sistema
+      var _posApos = m.index + m[0].length;
+      var _reProx = new RegExp(BG_TIMESTAMP_RE.source);
+      var _mProx = _reProx.exec(texto.substring(_posApos));
+      var _blocoConteudo = texto.substring(_posApos, _mProx ? _posApos + _mProx.index : texto.length).trim();
+      if (isTextoSemAtualizacao(_blocoConteudo)) continue;
       var dt2 = new Date(+p2[3], +p2[2]-1, +p2[1], +p2[4], +p2[5], p2[6]?+p2[6]:0);
       if (!isNaN(dt2.getTime())) entries.push({ dt: dt2, author: nome });
     }
@@ -1158,7 +1176,7 @@
       } else {
         conteudoModal = 'Última atualização registrada no Genesis:\n' + (incident.ultimaAtGenesis || '—');
       }
-      var cid = h('div', { style: { whiteSpace: 'pre-wrap', fontFamily: 'ui-monospace,monospace', fontSize: '12px', maxHeight: '60vh', overflowY: 'auto', padding: '12px', lineHeight: '1.6', background: 'var(--tmg-card2)', borderRadius: '8px' }, text: conteudoModal });
+      var cid = h('div', { style: { whiteSpace: 'pre-wrap', fontFamily: 'ui-monospace,monospace', fontSize: '12px', maxHeight: '60vh', overflowY: 'auto', padding: '12px', lineHeight: '1.6', background: 'var(--tne-card2)', borderRadius: '8px' }, text: conteudoModal });
       U.openModal((estado === 'acionamento' ? 'Acionamento' : 'Último Update') + ' — ' + ((m && m.osNumero) || incident.enderecoId || ''), cid);
     }
 
@@ -1166,7 +1184,7 @@
       return h('span', {
         style: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '28px' },
         title: 'Sem atualização'
-      }, [h('span', { class: 'tmg-pulse-dot' })]);
+      }, [h('span', { class: 'tne-pulse-dot' })]);
     }
 
     var previewHover = (textoCompleto || '')
@@ -1175,8 +1193,8 @@
 
     if (estado === 'acionamento') {
       var btnAc = h('button', {
-        class: 'tmg-btn',
-        style: { background: 'transparent', border: 'none', padding: '2px 4px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', color: 'var(--tmg-primary)', opacity: '0.85' },
+        class: 'tne-btn',
+        style: { background: 'transparent', border: 'none', padding: '2px 4px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', color: 'var(--tne-primary)', opacity: '0.85' },
         title: previewHover || 'Verificando acionamento',
         onclick: abrirModal
       }, [h('span', { html: ICONE_FOLHA_SVG })]);
@@ -1191,8 +1209,8 @@
         dtLabel = ehOntem ? 'ontem' : (resultado.dt.getDate()+'/'+(resultado.dt.getMonth()+1));
       }
       var btnAnt = h('button', {
-        class: 'tmg-btn',
-        style: { background:'transparent', border:'none', padding:'2px 4px', cursor:'pointer', display:'inline-flex', alignItems:'center', gap:'3px', color:'var(--tmg-muted)', opacity:'0.8' },
+        class: 'tne-btn',
+        style: { background:'transparent', border:'none', padding:'2px 4px', cursor:'pointer', display:'inline-flex', alignItems:'center', gap:'3px', color:'var(--tne-muted)', opacity:'0.8' },
         title: (previewHover||'') + (dtLabel?' ('+dtLabel+')':''),
         onclick: abrirModal
       }, [
@@ -1203,8 +1221,8 @@
     }
 
     return h('button', {
-      class: 'tmg-btn',
-      style: { background: 'transparent', border: 'none', padding: '2px 4px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', color: 'var(--tmg-green)', opacity: '0.85' },
+      class: 'tne-btn',
+      style: { background: 'transparent', border: 'none', padding: '2px 4px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', color: 'var(--tne-green)', opacity: '0.85' },
       title: previewHover,
       onclick: abrirModal
     }, [h('span', { html: ICONE_FOLHA_SVG })]);
@@ -1214,20 +1232,20 @@
     function pessoa(role, name, email, cor) {
       return h('div', { style: { display:'inline-flex', alignItems:'center', gap:'6px', flexWrap:'wrap', justifyContent:'center' } }, [
         h('span', { style:{ color:cor, fontWeight:'600', fontSize:'10px' }, text: role + ':' }),
-        h('span', { style:{ fontSize:'10px', color:'var(--tmg-muted)' }, text: name }),
-        h('a', { href:'mailto:'+email, style:{ fontSize:'10px', color:'var(--tmg-muted)', opacity:'.7', textDecoration:'none' }, text:'<'+email+'>' })
+        h('span', { style:{ fontSize:'10px', color:'var(--tne-muted)' }, text: name }),
+        h('a', { href:'mailto:'+email, style:{ fontSize:'10px', color:'var(--tne-muted)', opacity:'.7', textDecoration:'none' }, text:'<'+email+'>' })
       ]);
     }
     return h('div', {
-      style: { marginTop:'28px', paddingTop:'10px', borderTop:'1px solid var(--tmg-border)', textAlign:'center', color:'var(--tmg-muted)', fontSize:'10px', opacity:'.65', lineHeight:'1.7' }
+      style: { marginTop:'28px', paddingTop:'10px', borderTop:'1px solid var(--tne-border)', textAlign:'center', color:'var(--tne-muted)', fontSize:'10px', opacity:'.65', lineHeight:'1.7' }
     }, [
       h('div', { style:{marginBottom:'3px', fontWeight:'600', letterSpacing:'.04em', fontSize:'10px', textTransform:'uppercase', opacity:'.8' }, text:'Equipe de Desenvolvimento' }),
       h('div', { style:{display:'flex', gap:'14px', justifyContent:'center', flexWrap:'wrap'} }, [
-        pessoa('Dev', 'Lucas Infante', 'lucas.esao7751@gmail.com', 'var(--tmg-primary)'),
-        pessoa('Idealizador', 'Bruno Augusto', 'bruno.augusto.bafs@gmail.com', 'var(--tmg-blue)')
+        pessoa('Dev', 'Lucas Infante', 'lucas.esao7751@gmail.com', 'var(--tne-primary)'),
+        pessoa('Idealizador', 'Bruno Augusto', 'bruno.augusto.bafs@gmail.com', 'var(--tne-blue)')
       ]),
       h('div', { style:{marginTop:'3px', fontSize:'9px', opacity:'.6'}, text:'Controle operacional TIM · TLP' })
     ]);
   };
 
-})(window.TMG = window.TMG || {});
+})(window.TNE = window.TNE || {});

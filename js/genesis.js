@@ -1,5 +1,5 @@
-/* Parser do HTML do painel G.E.N.E.S.I.S (portado de genesis-parser.ts) */
-(function (TMG) {
+﻿/* Parser do HTML do painel G.E.N.E.S.I.S (portado de genesis-parser.ts) */
+(function (TNE) {
   var G = {};
 
   function decodeEntities(s) {
@@ -120,5 +120,5 @@
   G.parseGenesisHtml = parseGenesisHtml;
   G.horarioDtDeDowntime = horarioDtDeDowntime;
   G.ehGenesisHtml = ehGenesisHtml;
-  TMG.genesis = G;
-})(window.TMG = window.TMG || {});
+  TNE.genesis = G;
+})(window.TNE = window.TNE || {});

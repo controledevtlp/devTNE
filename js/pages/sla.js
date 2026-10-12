@@ -1,12 +1,12 @@
-/* Página: SLA / Aderência — usa U.donutChart (mesmo estilo do Dashboard) */
-(function (TMG) {
-  TMG.pages = TMG.pages || {};
-  var U = TMG.ui, C = TMG.constants, Comp = TMG.compute;
+﻿/* Página: SLA / Aderência — usa U.donutChart (mesmo estilo do Dashboard) */
+(function (TNE) {
+  TNE.pages = TNE.pages || {};
+  var U = TNE.ui, C = TNE.constants, Comp = TNE.compute;
 
   var META_PRIO = { P1:80, P2:75, P3:70, P4:70, P5:70 };
-  var COR_D  = C.CORES_TMG.green;
-  var COR_F  = C.CORES_TMG.red;
-  var COR_W  = C.CORES_TMG.orange;
+  var COR_D  = C.CORES_TNE.green;
+  var COR_F  = C.CORES_TNE.red;
+  var COR_W  = C.CORES_TNE.orange;
 
   function pctCor(pct, prio) {
     var meta = prio ? (META_PRIO[prio]||70) : 70;
@@ -14,9 +14,9 @@
   }
 
   /* ════════════════════════════════════════════════════════════════ */
-  TMG.pages.sla = function(container, ctx) {
+  TNE.pages.sla = function(container, ctx) {
     var data = ctx.data, app = ctx.app;
-    if (!data) { container.appendChild(U.h('div', { class:'tmg-card p-6 text-center', text:'Sem dados.' })); return; }
+    if (!data) { container.appendChild(U.h('div', { class:'tne-card p-6 text-center', text:'Sem dados.' })); return; }
 
     var tasks  = data.tasksEnriched || [];
     var estado = { regiao:'TODAS', prioridade:'TODAS' };
@@ -26,7 +26,7 @@
 
     /* ── Filtros ───────────────────────────────────────────────────── */
     function mkSel(options) {
-      return U.h('select', { class:'tmg-select',
+      return U.h('select', { class:'tne-select',
         style:{ padding:'6px 12px', fontSize:'12px', cursor:'pointer',
                 minWidth:'168px', borderRadius:'8px' }
       }, options.map(function(o){ return U.h('option', { value:o.v, text:o.t }); }));
@@ -38,7 +38,7 @@
       .concat(['P1','P2','P3','P4','P5'].map(function(p){ return { v:p, t:p }; })));
 
     function legItem(cor, txt) {
-      return U.h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', fontSize:'12px', color:'var(--tmg-muted)' } }, [
+      return U.h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', fontSize:'12px', color:'var(--tne-muted)' } }, [
         U.h('span', { style:{ width:'10px', height:'10px', borderRadius:'50%', background:cor, display:'inline-block' } }),
         U.h('span', { text:txt })
       ]);
@@ -79,11 +79,11 @@
       /* ════════════════════════════════════════════════════════════
        * SEÇÃO 1 — Aderência por Prioridade
        * ════════════════════════════════════════════════════════════ */
-      var sec1 = U.h('div', { class:'tmg-card p-5 mb-5' });
+      var sec1 = U.h('div', { class:'tne-card p-5 mb-5' });
       sec1.appendChild(U.h('div', {
         style:{ fontWeight:'800', fontSize:'13px', letterSpacing:'.07em',
-                color:'var(--tmg-fg)', textTransform:'uppercase',
-                marginBottom:'18px', borderBottom:'1px solid var(--tmg-border)',
+                color:'var(--tne-fg)', textTransform:'uppercase',
+                marginBottom:'18px', borderBottom:'1px solid var(--tne-border)',
                 paddingBottom:'10px' }
       }, 'ADERÊNCIA POR PRIORIDADE'));
 
@@ -106,15 +106,15 @@
         var meta  = META_PRIO[p.prioridade]||70;
 
         var card = U.h('div', {
-          style:{ background:'var(--tmg-card2)', borderRadius:'14px',
+          style:{ background:'var(--tne-card2)', borderRadius:'14px',
                   padding:'18px 14px 14px', display:'flex', flexDirection:'column',
-                  alignItems:'center', border:'1px solid var(--tmg-border)', position:'relative' }
+                  alignItems:'center', border:'1px solid var(--tne-border)', position:'relative' }
         });
 
         /* Título prioridade */
         card.appendChild(U.h('div', {
           style:{ fontWeight:'900', fontSize:'16px', letterSpacing:'.06em',
-                  color:'var(--tmg-fg)', alignSelf:'flex-start', marginBottom:'8px' }
+                  color:'var(--tne-fg)', alignSelf:'flex-start', marginBottom:'8px' }
         }, p.prioridade));
 
         /* Wrapper quadrado do donut com percentual centralizado */
@@ -131,7 +131,7 @@
           U.h('div', { style:{ fontSize:'clamp(20px,3vw,28px)', fontWeight:'800',
                                color:cor, lineHeight:'1', letterSpacing:'-.02em' },
             text: p.pct+'%' }),
-          U.h('div', { style:{ fontSize:'10px', color:'var(--tmg-muted)', marginTop:'3px' }, text:'aderência' })
+          U.h('div', { style:{ fontSize:'10px', color:'var(--tne-muted)', marginTop:'3px' }, text:'aderência' })
         ]);
         cWrap.appendChild(centroEl);
         card.appendChild(cWrap);
@@ -142,23 +142,23 @@
         }, [
           U.h('span', { style:{ fontSize:'13px' } }, [
             U.h('b', { style:{ fontSize:'clamp(14px,2vw,19px)', color:COR_D } }, String(p.dentro)+' '),
-            U.h('span', { style:{ fontSize:'10px', color:'var(--tmg-muted)' }, text:'dentro' })
+            U.h('span', { style:{ fontSize:'10px', color:'var(--tne-muted)' }, text:'dentro' })
           ]),
           U.h('span', { style:{ fontSize:'13px' } }, [
             U.h('b', { style:{ fontSize:'clamp(14px,2vw,19px)', color:COR_F } }, String(p.fora)+' '),
-            U.h('span', { style:{ fontSize:'10px', color:'var(--tmg-muted)' }, text:'fora' })
+            U.h('span', { style:{ fontSize:'10px', color:'var(--tne-muted)' }, text:'fora' })
           ])
         ]));
 
         /* Rodapé: Prazo / Total / Meta na mesma linha, mesma cor */
         card.appendChild(U.h('div', {
           style:{ display:'flex', justifyContent:'space-between', width:'100%',
-                  marginTop:'10px', paddingTop:'8px', borderTop:'1px solid var(--tmg-border)',
-                  fontSize:'11px', color:'var(--tmg-muted)' }
+                  marginTop:'10px', paddingTop:'8px', borderTop:'1px solid var(--tne-border)',
+                  fontSize:'11px', color:'var(--tne-muted)' }
         }, [
-          U.h('span', null, [ U.h('b', { style:{ fontSize:'13px', color:'var(--tmg-fg)' } }, p.prazoHoras+'h '), U.h('span', { text:'prazo' }) ]),
-          U.h('span', { style:{ textAlign:'center' } }, [ U.h('b', { style:{ fontSize:'13px', color:'var(--tmg-fg)' } }, String(total)+' '), U.h('span', { text:'total' }) ]),
-          U.h('span', { style:{ textAlign:'right' } }, [ U.h('b', { style:{ fontSize:'13px', color:'var(--tmg-fg)' } }, meta+'% '), U.h('span', { text:'meta' }) ])
+          U.h('span', null, [ U.h('b', { style:{ fontSize:'13px', color:'var(--tne-fg)' } }, p.prazoHoras+'h '), U.h('span', { text:'prazo' }) ]),
+          U.h('span', { style:{ textAlign:'center' } }, [ U.h('b', { style:{ fontSize:'13px', color:'var(--tne-fg)' } }, String(total)+' '), U.h('span', { text:'total' }) ]),
+          U.h('span', { style:{ textAlign:'right' } }, [ U.h('b', { style:{ fontSize:'13px', color:'var(--tne-fg)' } }, meta+'% '), U.h('span', { text:'meta' }) ])
         ]));
 
         grid.appendChild(card);
@@ -185,11 +185,11 @@
        *   LEFT : U.donutChart geral (mesmo estilo dashboard)
        *   RIGHT: tabela de regiões, centralizada
        * ════════════════════════════════════════════════════════════ */
-      var sec2 = U.h('div', { class:'tmg-card p-5' });
+      var sec2 = U.h('div', { class:'tne-card p-5' });
       sec2.appendChild(U.h('div', {
         style:{ fontWeight:'800', fontSize:'13px', letterSpacing:'.07em',
-                color:'var(--tmg-fg)', textTransform:'uppercase',
-                marginBottom:'16px', borderBottom:'1px solid var(--tmg-border)',
+                color:'var(--tne-fg)', textTransform:'uppercase',
+                marginBottom:'16px', borderBottom:'1px solid var(--tne-border)',
                 paddingBottom:'10px' }
       }, 'ADERÊNCIA POR REGIÃO'));
 
@@ -212,18 +212,18 @@
                 transform:'translate(-50%,-52%)', textAlign:'center', pointerEvents:'none' }
       }, [
         U.h('div', { style:{ fontSize:'clamp(16px,2.2vw,22px)', fontWeight:'800', color:gerCor, lineHeight:'1' }, text:ger.pct+'%' }),
-        U.h('div', { style:{ fontSize:'9px', color:'var(--tmg-muted)', marginTop:'3px' }, text:'aderência' })
+        U.h('div', { style:{ fontSize:'9px', color:'var(--tne-muted)', marginTop:'3px' }, text:'aderência' })
       ]));
       gerSide.appendChild(gerWrap);
       gerSide.appendChild(U.h('div', { style:{ textAlign:'center', lineHeight:'1.7', fontSize:'11px' } }, [
-        U.h('div', { style:{ fontWeight:'800', fontSize:'12px', color:'var(--tmg-fg)', letterSpacing:'.04em' }, text:'ADERÊNCIA GERAL' }),
+        U.h('div', { style:{ fontWeight:'800', fontSize:'12px', color:'var(--tne-fg)', letterSpacing:'.04em' }, text:'ADERÊNCIA GERAL' }),
         U.h('div', null, [
           U.h('b', { style:{ color:COR_D } }, String(ger.dentro)),
-          U.h('span', { style:{ color:'var(--tmg-muted)' }, text:' dentro / ' }),
+          U.h('span', { style:{ color:'var(--tne-muted)' }, text:' dentro / ' }),
           U.h('b', { style:{ color:COR_F } }, String(ger.fora)),
-          U.h('span', { style:{ color:'var(--tmg-muted)' }, text:' fora' })
+          U.h('span', { style:{ color:'var(--tne-muted)' }, text:' fora' })
         ]),
-        U.h('div', { style:{ color:'var(--tmg-muted)' }, text:'Total: '+gerTotal })
+        U.h('div', { style:{ color:'var(--tne-muted)' }, text:'Total: '+gerTotal })
       ]));
       regLayout.appendChild(gerSide);
 
@@ -243,9 +243,9 @@
         style:{ display:'grid',
                 gridTemplateColumns:'1fr auto auto auto auto',
                 padding:'0 8px 8px 8px', gap:'8px',
-                borderBottom:'1px solid var(--tmg-border)',
+                borderBottom:'1px solid var(--tne-border)',
                 fontSize:'10px', fontWeight:'700', letterSpacing:'.06em',
-                color:'var(--tmg-muted)', textTransform:'uppercase' }
+                color:'var(--tne-muted)', textTransform:'uppercase' }
       }, ['REGIÃO','TOTAL','DENTRO','FORA','ADERÊNCIA'].map(function(t, i){
         return U.h('div', { style:{ textAlign: i===0?'left':'center' }, text:t });
       })));
@@ -269,7 +269,7 @@
           app.openDrillTasks({ tipo:'regiaoSla', arg:r.regiao+'|fora' }, {}, 'FORA SLA: '+label);
         });
 
-        row.appendChild(U.h('div', { style:{ fontWeight:'600', fontSize:'13px', color:'var(--tmg-fg)' }, text:label }));
+        row.appendChild(U.h('div', { style:{ fontWeight:'600', fontSize:'13px', color:'var(--tne-fg)' }, text:label }));
         row.appendChild(U.h('div', { style:{ textAlign:'center', fontWeight:'700', fontSize:'14px' }, text:String(rTotal) }));
         row.appendChild(U.h('div', { style:{ textAlign:'center', fontWeight:'700', fontSize:'14px', color:COR_D }, text:String(r.dentro) }));
         row.appendChild(U.h('div', { style:{ textAlign:'center', fontWeight:'700', fontSize:'14px', color:COR_F }, text:String(r.fora) }));
@@ -287,4 +287,4 @@
     render();
   };
 
-})(window.TMG = window.TMG || {});
+})(window.TNE = window.TNE || {});

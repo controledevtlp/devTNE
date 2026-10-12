@@ -1,4 +1,4 @@
-/* =====================================================================
+﻿/* =====================================================================
  * Página: Sites Fora — Incidentes
  * ---------------------------------------------------------------------
  * Mostra a lista de incidentes importados do painel G.E.N.E.S.I.S
@@ -9,18 +9,18 @@
  * lista — as contagens (resumo, dashboard etc.) sempre usam o total real,
  * como se não estivesse agrupado.
  * ===================================================================== */
-(function (TMG) {
-  TMG.pages = TMG.pages || {};
-  var U = TMG.ui, Comp = TMG.compute;
+(function (TNE) {
+  TNE.pages = TNE.pages || {};
+  var U = TNE.ui, Comp = TNE.compute;
 
-  var LS_AGRUPADO = 'tmg_sf_agrupado';
+  var LS_AGRUPADO = 'tne_sf_agrupado';
   function getAgrupado() { try { return localStorage.getItem(LS_AGRUPADO) === '1'; } catch (e) { return false; } }
   function setAgrupado(v) { try { localStorage.setItem(LS_AGRUPADO, v ? '1' : '0'); } catch (e) {} }
 
   // estado persiste entre re-renders (closure do módulo)
   var state = { busca: '', agrupado: getAgrupado(), causaFiltro: '', filtroSemAtualizacao: false, filtroAcionamento: false };
 
-  TMG.pages.sitesFora = function (container, ctx) {
+  TNE.pages.sitesFora = function (container, ctx) {
     var incidents = (ctx.data && ctx.data.incidentsEnriched) || [];
     var ativos = incidents.filter(function (i) { return (i.statusTrat || 'ATIVO').toUpperCase() !== 'RESOLVIDO'; });
 
@@ -45,11 +45,11 @@
 
   // ---------------- Lista de Incidentes (busca livre + agrupamento de exibição) ----------------
   function buildListaIncidentes(incidents, tasksEnriched) {
-    var wrap = U.h('div', { class: 'tmg-card p-5' });
+    var wrap = U.h('div', { class: 'tne-card p-5' });
 
     var currentRows = [];
     var btnCopy = U.h('button', {
-      class: 'tmg-btn tmg-btn-ghost', title: 'Copiar lista filtrada em texto (formato WhatsApp)',
+      class: 'tne-btn tne-btn-ghost', title: 'Copiar lista filtrada em texto (formato WhatsApp)',
       style: { padding: '3px 9px', fontSize: '12px' }, text: '📋',
       onclick: function() { U.copyText(U.incidentTableCopyText(currentRows, 'Sites Fora', tasksEnriched), 'Lista copiada!'); }
     });
@@ -63,7 +63,7 @@
       ])
     ]);
     wrap.appendChild(headRow);
-    wrap.appendChild(U.h('p', { class: 'text-xs mb-3', style: { color: 'var(--tmg-muted)' }, text: 'Busque por site, end id, cidade, ANF, causa ou alarme. ⚡ = correlacionado a outro(s) incidente(s) (mesma ANF/horário próximo).' }));
+    wrap.appendChild(U.h('p', { class: 'text-xs mb-3', style: { color: 'var(--tne-muted)' }, text: 'Busque por site, end id, cidade, ANF, causa ou alarme. ⚡ = correlacionado a outro(s) incidente(s) (mesma ANF/horário próximo).' }));
 
     // ---- filtros: causa + atualização ----
     var causaCount = {};
@@ -81,8 +81,8 @@
       return {
         fontSize: '11px', padding: '3px 10px', borderRadius: '20px', cursor: 'pointer',
         background: active ? (danger ? 'rgba(231,76,60,.25)' : 'rgba(255,140,0,.25)') : 'rgba(255,255,255,.06)',
-        color: active ? (danger ? '#e74c3c' : 'var(--tmg-primary)') : 'var(--tmg-muted)',
-        border: '1px solid ' + (active ? (danger ? '#e74c3c' : 'var(--tmg-primary)') : 'rgba(255,255,255,.12)'),
+        color: active ? (danger ? '#e74c3c' : 'var(--tne-primary)') : 'var(--tne-muted)',
+        border: '1px solid ' + (active ? (danger ? '#e74c3c' : 'var(--tne-primary)') : 'rgba(255,255,255,.12)'),
         fontWeight: active ? '700' : '400'
       };
     }
@@ -91,31 +91,31 @@
       filtrosEl.innerHTML = '';
 
       var allActive = !state.causaFiltro;
-      var allChip = U.h('button', { class: 'tmg-btn tmg-btn-ghost', style: chipStyle(allActive, false), text: 'Todos' });
+      var allChip = U.h('button', { class: 'tne-btn tne-btn-ghost', style: chipStyle(allActive, false), text: 'Todos' });
       allChip.addEventListener('click', function() { state.causaFiltro = ''; renderFiltros(); renderLista(); });
       filtrosEl.appendChild(allChip);
 
       causaKeys.forEach(function(k) {
         var active = state.causaFiltro === k;
-        var chip = U.h('button', { class: 'tmg-btn tmg-btn-ghost', style: chipStyle(active, false), text: k + ' (' + causaCount[k] + ')' });
+        var chip = U.h('button', { class: 'tne-btn tne-btn-ghost', style: chipStyle(active, false), text: k + ' (' + causaCount[k] + ')' });
         chip.addEventListener('click', function() { state.causaFiltro = active ? '' : k; renderFiltros(); renderLista(); });
         filtrosEl.appendChild(chip);
       });
 
       if (causaCount['__SEM__']) {
         var semActive = state.causaFiltro === '__SEM__';
-        var semChip = U.h('button', { class: 'tmg-btn tmg-btn-ghost', style: chipStyle(semActive, true), text: 'SEM CAUSA (' + causaCount['__SEM__'] + ')' });
+        var semChip = U.h('button', { class: 'tne-btn tne-btn-ghost', style: chipStyle(semActive, true), text: 'SEM CAUSA (' + causaCount['__SEM__'] + ')' });
         semChip.addEventListener('click', function() { state.causaFiltro = semActive ? '' : '__SEM__'; renderFiltros(); renderLista(); });
         filtrosEl.appendChild(semChip);
       }
 
       var semAt = state.filtroSemAtualizacao;
-      var semAtBtn = U.h('button', { class: 'tmg-btn tmg-btn-ghost', style: chipStyle(semAt, true), text: '⚠️ > 1h sem atualização' });
+      var semAtBtn = U.h('button', { class: 'tne-btn tne-btn-ghost', style: chipStyle(semAt, true), text: '⚠️ > 1h sem atualização' });
       semAtBtn.addEventListener('click', function() { state.filtroSemAtualizacao = !semAt; renderFiltros(); renderLista(); });
       filtrosEl.appendChild(semAtBtn);
 
       var acion = state.filtroAcionamento;
-      var acionBtn = U.h('button', { class: 'tmg-btn tmg-btn-ghost', style: chipStyle(acion, true), text: '📡 SITES FORA ACIONAMENTO' });
+      var acionBtn = U.h('button', { class: 'tne-btn tne-btn-ghost', style: chipStyle(acion, true), text: '📡 SITES FORA ACIONAMENTO' });
       acionBtn.addEventListener('click', function() { state.filtroAcionamento = !acion; renderFiltros(); renderLista(); });
       filtrosEl.appendChild(acionBtn);
     }
@@ -199,11 +199,11 @@
       currentRows = rows;
       listEl.innerHTML = '';
       if (!incidents.length) {
-        listEl.appendChild(U.h('div', { class: 'text-sm py-10 text-center', style: { color: 'var(--tmg-muted)' }, html: 'Nenhum incidente importado ainda.<br>Vá em <b>Importar dados</b> e use a busca automática (ou cole o painel G.E.N.E.S.I.S).' }));
+        listEl.appendChild(U.h('div', { class: 'text-sm py-10 text-center', style: { color: 'var(--tne-muted)' }, html: 'Nenhum incidente importado ainda.<br>Vá em <b>Importar dados</b> e use a busca automática (ou cole o painel G.E.N.E.S.I.S).' }));
         return;
       }
       if (!rows.length) {
-        listEl.appendChild(U.h('div', { class: 'text-sm py-10 text-center', style: { color: 'var(--tmg-muted)' }, text: 'Nenhum incidente encontrado para essa busca.' }));
+        listEl.appendChild(U.h('div', { class: 'text-sm py-10 text-center', style: { color: 'var(--tne-muted)' }, text: 'Nenhum incidente encontrado para essa busca.' }));
         return;
       }
       listEl.appendChild(U.incidentTable(rows, tasksEnriched));
@@ -211,4 +211,4 @@
     renderLista();
     return wrap;
   }
-})(window.TMG = window.TMG || {});
+})(window.TNE = window.TNE || {});

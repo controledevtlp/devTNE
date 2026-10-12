@@ -1,8 +1,8 @@
-/* Agregacoes e enriquecimento (portado de app/api/*) */
-(function (TMG) {
-  var C = TMG.constants;
-  var D = TMG.domain;
-  var G = TMG.genesis;
+﻿/* Agregacoes e enriquecimento (portado de app/api/*) */
+(function (TNE) {
+  var C = TNE.constants;
+  var D = TNE.domain;
+  var G = TNE.genesis;
   var C2 = {};
 
   function up(s) { return (s == null ? '' : s).toString().toUpperCase().trim(); }
@@ -692,5 +692,5 @@
   C2.drillTasks = drillTasks;
   C2.drillIncidents = drillIncidents;
   C2.agruparIncidentesPorEndId = agruparIncidentesPorEndId;
-  TMG.compute = C2;
-})(window.TMG = window.TMG || {});
+  TNE.compute = C2;
+})(window.TNE = window.TNE || {});

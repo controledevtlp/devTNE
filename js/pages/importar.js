@@ -1,7 +1,7 @@
-/* =====================================================================
+﻿/* =====================================================================
  * Página: Importar dados
  * ---------------------------------------------------------------------
- * Carrega as TAREFAS a partir dos arquivos "Atividades-TMG_FMMT" da pasta
+ * Carrega as TAREFAS a partir dos arquivos "Atividades-tne_FMMT" da pasta
  * de Downloads. Dois caminhos: leitura automática (Chrome/Edge) ou upload
  * manual (qualquer navegador).
  *
@@ -14,18 +14,18 @@
  * Os INCIDENTES (Sites Fora) podem ser importados de três formas:
  *   • colando o texto/HTML do painel G.E.N.E.S.I.S em um campo de texto;
  *   • anexando o arquivo do painel G.E.N.E.S.I.S;
- *   • clicando em "Buscar automaticamente" — chama a Ponte TMG local
+ *   • clicando em "Buscar automaticamente" — chama a Ponte TNE local
  *     (servidor que roda na sua máquina enquanto conectado na VPN e
  *     busca direto na página do painel, sem precisar de nenhum
  *     executável extra).
  * ===================================================================== */
-(function (TMG) {
-  TMG.pages = TMG.pages || {};
-  var U = TMG.ui, C = TMG.constants, FS = TMG.files, G = TMG.genesis, Comp = TMG.compute;
+(function (TNE) {
+  TNE.pages = TNE.pages || {};
+  var U = TNE.ui, C = TNE.constants, FS = TNE.files, G = TNE.genesis, Comp = TNE.compute;
 
-  // Endereço da Ponte TMG local (ver ponte_tmg.py). Só funciona com o
+  // Endereço da Ponte TNE local (ver ponte_tne.py). Só funciona com o
   // servidor local rodando e a VPN da empresa conectada.
-  var PONTE_URL = 'http://localhost:5057/api/tmg/incidentes';
+  var PONTE_URL = 'http://localhost:5057/api/tne/incidentes';
 
   // Processa um texto/HTML do G.E.N.E.S.I.S e atualiza os incidentes.
   // Importante: salva SEMPRE os incidentes completos (não agrupados) — o
@@ -41,7 +41,7 @@
       var ids = genesisRows.map(function (r) { return (r.enderecoId || r.site || '').toString().toUpperCase(); }).filter(Boolean);
       var validMap = (data && data.validMap) || {};
       if (ids.length) {
-        try { var lk = await TMG.api.lookupCities(ids); validMap = Object.assign({}, validMap, (lk && lk.map) || {}); }
+        try { var lk = await TNE.api.lookupCities(ids); validMap = Object.assign({}, validMap, (lk && lk.map) || {}); }
         catch (e) { /* sem backend de cidades: segue sem enriquecimento */ }
       }
       app.extendValidMap && app.extendValidMap(validMap);
@@ -92,7 +92,7 @@
     });
   }
 
-  // Busca os incidentes automaticamente via Ponte TMG local (que por sua
+  // Busca os incidentes automaticamente via Ponte TNE local (que por sua
   // vez executa o puxar_dados.exe). Requer VPN conectada e a ponte rodando.
   async function buscarAutomatico(data, app) {
     try {
@@ -101,12 +101,12 @@
       try {
         resp = await fetch(PONTE_URL, { method: 'GET' });
       } catch (e) {
-        U.toast('Não consegui falar com a Ponte TMG local. Ela está rodando (iniciar_ponte_tmg.bat) e você está conectado na VPN?', 'err');
+        U.toast('Não consegui falar com a Ponte TNE local. Ela está rodando (iniciar_ponte_tne.bat) e você está conectado na VPN?', 'err');
         return false;
       }
       var json = await resp.json().catch(function () { return null; });
       if (!resp.ok || !json || json.erro) {
-        U.toast((json && json.erro) || ('A Ponte TMG retornou um erro (HTTP ' + resp.status + ').'), 'err');
+        U.toast((json && json.erro) || ('A Ponte TNE retornou um erro (HTTP ' + resp.status + ').'), 'err');
         return false;
       }
       var genesisRows = genesisRowsFromPonte(json.incidentes);
@@ -115,7 +115,7 @@
       var ids = genesisRows.map(function (r) { return (r.enderecoId || r.site || '').toString().toUpperCase(); }).filter(Boolean);
       var validMap = (data && data.validMap) || {};
       if (ids.length) {
-        try { var lk = await TMG.api.lookupCities(ids); validMap = Object.assign({}, validMap, (lk && lk.map) || {}); }
+        try { var lk = await TNE.api.lookupCities(ids); validMap = Object.assign({}, validMap, (lk && lk.map) || {}); }
         catch (e) { /* sem backend de cidades: segue sem enriquecimento */ }
       }
       app.extendValidMap && app.extendValidMap(validMap);
@@ -133,7 +133,7 @@
     }
   }
 
-  TMG.pages.importar = function (container, ctx) {
+  TNE.pages.importar = function (container, ctx) {
     var app = ctx.app;
     var data = ctx.data || {};
     var meta = FS.getMeta();
@@ -147,9 +147,9 @@
 
     // ---- status compacto (com ícones) ----
     container.appendChild(U.h('div', { class: 'grid grid-cols-2 md:grid-cols-4 gap-3 mb-7' }, [
-      U.kpiCard({ label: '📋 Tarefas', value: U.fmtNum(nTasks), cor: C.CORES_TMG.orange }),
-      U.kpiCard({ label: '🚨 Incidentes', value: U.fmtNum(nInc), cor: C.CORES_TMG.blue }),
-      U.kpiCard({ label: '📥 Origem das tarefas', value: tMeta.origem === 'pasta' ? 'Pasta automática' : (tMeta.origem === 'upload' ? 'Upload manual' : '—'), cor: C.CORES_TMG.green }),
+      U.kpiCard({ label: '📋 Tarefas', value: U.fmtNum(nTasks), cor: C.CORES_TNE.orange }),
+      U.kpiCard({ label: '🚨 Incidentes', value: U.fmtNum(nInc), cor: C.CORES_TNE.blue }),
+      U.kpiCard({ label: '📥 Origem das tarefas', value: tMeta.origem === 'pasta' ? 'Pasta automática' : (tMeta.origem === 'upload' ? 'Upload manual' : '—'), cor: C.CORES_TNE.green }),
       U.kpiCard({ label: '🕒 Atualizado em', value: tMeta.em ? new Date(tMeta.em).toLocaleDateString('pt-BR') : '—', sub: tMeta.em ? new Date(tMeta.em).toLocaleTimeString('pt-BR') : null, cor: '#8b5cf6' })
     ]));
 
@@ -159,7 +159,7 @@
       var vCache = data.validMapFromCache;
       var vErr   = data.validMapErr   || null;
 
-      var statusColor = vErr ? '#e74c3c' : (vSize > 0 ? C.CORES_TMG.green : '#f39c12');
+      var statusColor = vErr ? '#e74c3c' : (vSize > 0 ? C.CORES_TNE.green : '#f39c12');
       var statusIcon  = vErr ? '❌' : (vSize > 0 ? '✅' : '⚠️');
       var statusText  = vErr
         ? ('Erro ao carregar: ' + vErr)
@@ -168,18 +168,18 @@
           : 'Nenhum site mapeado — incidentes serão classificados como OUTROS');
 
       var vmCard = U.h('div', {
-        class: 'tmg-card p-4 mb-7 flex items-center justify-between flex-wrap gap-3',
+        class: 'tne-card p-4 mb-7 flex items-center justify-between flex-wrap gap-3',
         style: { border: '1px solid ' + statusColor + '44', background: statusColor + '0d' }
       });
       vmCard.appendChild(U.h('div', { class: 'flex items-center gap-3 flex-1 min-w-0' }, [
         U.h('span', { style: { fontSize: '20px', flexShrink: '0' }, text: statusIcon }),
         U.h('div', { class: 'flex flex-col gap-0' }, [
           U.h('span', { style: { fontWeight: '700', fontSize: '13px' }, text: 'Mapeamento de Cidades (VALID_CAD)' }),
-          U.h('span', { style: { fontSize: '12px', color: 'var(--tmg-muted)' }, text: statusText })
+          U.h('span', { style: { fontSize: '12px', color: 'var(--tne-muted)' }, text: statusText })
         ])
       ]));
       vmCard.appendChild(U.h('button', {
-        class: 'tmg-btn tmg-btn-ghost clickable', style: { fontSize: '12px', flexShrink: '0' },
+        class: 'tne-btn tne-btn-ghost clickable', style: { fontSize: '12px', flexShrink: '0' },
         html: '🔄 Atualizar mapeamento',
         onclick: function () { app.refreshValidMap && app.refreshValidMap(); }
       }));
@@ -189,7 +189,7 @@
     // =====================================================================
     // SEÇÃO 1 — TAREFAS (ATIVIDADES)
     // =====================================================================
-    container.appendChild(secaoTitulo('📋 Tarefas (Atividades)', C.CORES_TMG.orange));
+    container.appendChild(secaoTitulo('📋 Tarefas (Atividades)', C.CORES_TNE.orange));
 
     var tarefasGrid = U.h('div', { class: 'grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8' });
 
@@ -199,7 +199,7 @@
     function makeSlot(opts) {
       // opts: { tipo:'ag'|'na', label, icon, filtro, slotInfo, onClear }
       var si = opts.slotInfo;
-      var card = U.h('div', { class: 'tmg-card p-4 flex flex-col gap-3' });
+      var card = U.h('div', { class: 'tne-card p-4 flex flex-col gap-3' });
 
       // Cabeçalho do slot
       var hdr = U.h('div', { class: 'flex items-center justify-between' }, [
@@ -208,7 +208,7 @@
           U.h('span', { text: opts.label })
         ]),
         si ? U.h('button', {
-          class: 'tmg-btn tmg-btn-ghost clickable',
+          class: 'tne-btn tne-btn-ghost clickable',
           style: { fontSize: '11px', padding: '2px 8px', color: '#e74c3c' },
           text: '✕ Remover',
           onclick: async function () {
@@ -223,15 +223,15 @@
 
       // Status atual do slot
       if (si) {
-        var nomeCurto = si.nome.replace(/Atividades-TMG_FMMT_?/i, '').replace(/\.(xlsx?|csv)$/i, '') || si.nome;
+        var nomeCurto = si.nome.replace(/Atividades-tne_FMMT_?/i, '').replace(/\.(xlsx?|csv)$/i, '') || si.nome;
         card.appendChild(U.h('div', {
           class: 'flex items-center gap-2 p-2 rounded',
           style: { background: 'rgba(46,204,113,.08)', border: '1px solid rgba(46,204,113,.25)', fontSize: '12px' }
         }, [
           U.h('span', { text: '✅' }),
           U.h('div', { class: 'flex flex-col' }, [
-            U.h('span', { style: { fontWeight: '700', color: 'var(--tmg-green)' }, text: nomeCurto }),
-            U.h('span', { style: { color: 'var(--tmg-muted)', fontSize: '11px' } },
+            U.h('span', { style: { fontWeight: '700', color: 'var(--tne-green)' }, text: nomeCurto }),
+            U.h('span', { style: { color: 'var(--tne-muted)', fontSize: '11px' } },
               U.fmtNum(si.qtd) + ' tarefa(s) · ' + (si.em ? new Date(si.em).toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'}) : ''))
           ])
         ]));
@@ -276,7 +276,7 @@
     // Slot 1 — Agendada (arquivo com data de hoje)
     tarefasGrid.appendChild(makeSlot({
       tipo: 'ag', label: 'Planilha agendada (data de hoje)', icon: '📅',
-      filtroLabel: 'Atividades-TMG_FMMT_DATA',
+      filtroLabel: 'Atividades-tne_FMMT_DATA',
       slotInfo: slots.ag,
       onClear: function () { FS.clearSlotAg(); }
     }));
@@ -284,31 +284,31 @@
     // Slot 2 — Não-agendada
     tarefasGrid.appendChild(makeSlot({
       tipo: 'na', label: 'Planilha não-agendada', icon: '📋',
-      filtroLabel: 'Atividades-TMG_FMMT_Não-agendada',
+      filtroLabel: 'Atividades-tne_FMMT_Não-agendada',
       slotInfo: slots.na,
       onClear: function () { FS.clearSlotNa(); }
     }));
 
     // --- leitura automática da pasta ---
-    var pastaCard = U.h('div', { class: 'tmg-card p-5 flex flex-col gap-3' });
+    var pastaCard = U.h('div', { class: 'tne-card p-5 flex flex-col gap-3' });
     pastaCard.appendChild(U.h('h3', { class: 'text-sm font-bold flex items-center gap-2' }, [
       U.h('span', { text: '🔄' }), U.h('span', { text: 'Leitura automática da pasta' })
     ]));
     if (!FS.supportsDirectoryPicker()) {
-      pastaCard.appendChild(U.h('p', { class: 'text-xs', style: { color: 'var(--tmg-muted)' }, html: 'Disponível só no <b>Chrome</b> ou <b>Edge</b>. Use o upload manual ao lado.' }));
+      pastaCard.appendChild(U.h('p', { class: 'text-xs', style: { color: 'var(--tne-muted)' }, html: 'Disponível só no <b>Chrome</b> ou <b>Edge</b>. Use o upload manual ao lado.' }));
     } else {
-      var statusPasta = infoRow('📁', 'Buscando pasta conectada...', 'var(--tmg-muted)');
+      var statusPasta = infoRow('📁', 'Buscando pasta conectada...', 'var(--tne-muted)');
       pastaCard.appendChild(statusPasta);
       FS.folderName().then(function (nome) {
-        setInfoRow(statusPasta, '📁', nome ? (nome + ' — pronta para leitura') : 'Nenhuma pasta conectada ainda.', nome ? 'var(--tmg-green)' : 'var(--tmg-muted)');
+        setInfoRow(statusPasta, '📁', nome ? (nome + ' — pronta para leitura') : 'Nenhuma pasta conectada ainda.', nome ? 'var(--tne-green)' : 'var(--tne-muted)');
       });
       // duas linhas informativas fixas, com ícone — deixam claro o
       // comportamento automático sem precisar abrir nenhum menu.
-      pastaCard.appendChild(infoRow('⏱', 'Verifica automaticamente a cada ' + intervaloSeg + 's', 'var(--tmg-muted)'));
-      pastaCard.appendChild(infoRow('📦', 'Arquivos lidos são movidos para a subpasta "Importados/"', 'var(--tmg-muted)'));
+      pastaCard.appendChild(infoRow('⏱', 'Verifica automaticamente a cada ' + intervaloSeg + 's', 'var(--tne-muted)'));
+      pastaCard.appendChild(infoRow('📦', 'Arquivos lidos são movidos para a subpasta "Importados/"', 'var(--tne-muted)'));
 
       var btnVerificar = U.h('button', {
-        class: 'tmg-btn tmg-btn-primary clickable', html: app.icon('refresh') + ' Verificar agora',
+        class: 'tne-btn tne-btn-primary clickable', html: app.icon('refresh') + ' Verificar agora',
         onclick: async function () {
           try {
             U.loading(true, 'Verificando pasta...');
@@ -321,7 +321,7 @@
         }
       });
       var btnConectar = U.h('button', {
-        class: 'tmg-btn tmg-btn-ghost clickable', html: '🔗 Conectar outra pasta...',
+        class: 'tne-btn tne-btn-ghost clickable', html: '🔗 Conectar outra pasta...',
         onclick: async function () {
           try {
             U.loading(true, 'Abrindo seletor de pasta...');
@@ -336,27 +336,27 @@
         }
       });
       pastaCard.appendChild(U.h('div', { class: 'flex gap-2 flex-wrap mt-1' }, [btnVerificar, btnConectar]));
-      pastaCard.appendChild(U.h('p', { class: 'text-xs mt-1', style: { color: 'var(--tmg-muted)' }, text: '💡 Pasta de Downloads com muitos arquivos antigos deixa a verificação mais lenta — conectar uma pasta menor e dedicada ajuda.' }));
+      pastaCard.appendChild(U.h('p', { class: 'text-xs mt-1', style: { color: 'var(--tne-muted)' }, text: '💡 Pasta de Downloads com muitos arquivos antigos deixa a verificação mais lenta — conectar uma pasta menor e dedicada ajuda.' }));
     }
     container.appendChild(tarefasGrid);
 
     // =====================================================================
     // SEÇÃO 2 — INCIDENTES (SITES FORA)
     // =====================================================================
-    container.appendChild(secaoTitulo('🚨 Incidentes (Sites Fora)', C.CORES_TMG.blue));
+    container.appendChild(secaoTitulo('🚨 Incidentes (Sites Fora)', C.CORES_TNE.blue));
 
     // --- ação primária + leitura automática da pasta — lado a lado ---
     var autoCard = U.h('div', {
-      class: 'tmg-card p-6',
+      class: 'tne-card p-6',
       style: { border: '1px solid rgba(46,204,113,.3)', background: 'rgba(46,204,113,.05)' }
     });
     autoCard.appendChild(U.h('div', { class: 'flex items-center gap-2 mb-1' }, [
-      U.h('span', { class: 'tmg-pulse-dot' }),
+      U.h('span', { class: 'tne-pulse-dot' }),
       U.h('h3', { class: 'text-base font-bold flex items-center gap-2' }, [U.h('span', { text: '📡' }), U.h('span', { text: 'Buscar incidentes automaticamente' })])
     ]));
-    autoCard.appendChild(U.h('p', { class: 'text-xs mb-4', style: { color: 'var(--tmg-muted)' }, text: 'Conecte-se à VPN da empresa, deixe a Ponte TMG local aberta, e clique no botão — sem copiar nem colar nada.' }));
+    autoCard.appendChild(U.h('p', { class: 'text-xs mb-4', style: { color: 'var(--tne-muted)' }, text: 'Conecte-se à VPN da empresa, deixe a Ponte TNE local aberta, e clique no botão — sem copiar nem colar nada.' }));
     autoCard.appendChild(U.h('button', {
-      class: 'tmg-btn tmg-btn-lg clickable', style: { background: C.CORES_TMG.green, borderColor: C.CORES_TMG.green, color: '#0a160f' },
+      class: 'tne-btn tne-btn-lg clickable', style: { background: C.CORES_TNE.green, borderColor: C.CORES_TNE.green, color: '#0a160f' },
       html: '🔄 Buscar incidentes agora', onclick: function () { buscarAutomatico(data, app); }
     }));
     var incidentGrid = U.h('div', { class: 'grid grid-cols-1 lg:grid-cols-2 gap-4 mb-3' });
@@ -365,19 +365,19 @@
     container.appendChild(incidentGrid);
 
     // --- opções manuais, escondidas por padrão (<details> nativo: some sem perder o texto digitado) ---
-    var details = U.h('details', { class: 'tmg-details tmg-card p-5' });
+    var details = U.h('details', { class: 'tne-details tne-card p-5' });
     details.appendChild(U.h('summary', { html: '✍️ Prefere importar manualmente?' }));
 
     var manualBody = U.h('div', { class: 'grid grid-cols-1 lg:grid-cols-2 gap-4 mt-1' });
 
     var colCol = U.h('div', { class: 'flex flex-col gap-2' });
-    colCol.appendChild(U.h('div', { class: 'text-xs flex items-center gap-1', style: { color: 'var(--tmg-muted)' } }, [U.h('span', { text: '📋' }), U.h('span', { text: 'Colar o conteúdo da página:' })]));
-    var txt = U.h('textarea', { class: 'tmg-input w-full', rows: '6', placeholder: 'Cole aqui o conteúdo do painel G.E.N.E.S.I.S (Ctrl+V)...', style: { fontFamily: 'monospace', fontSize: '12px', resize: 'vertical' } });
-    var btnTxt = U.h('button', { class: 'tmg-btn tmg-btn-primary clickable', html: '⬆️ Importar texto colado', onclick: async function () {
+    colCol.appendChild(U.h('div', { class: 'text-xs flex items-center gap-1', style: { color: 'var(--tne-muted)' } }, [U.h('span', { text: '📋' }), U.h('span', { text: 'Colar o conteúdo da página:' })]));
+    var txt = U.h('textarea', { class: 'tne-input w-full', rows: '6', placeholder: 'Cole aqui o conteúdo do painel G.E.N.E.S.I.S (Ctrl+V)...', style: { fontFamily: 'monospace', fontSize: '12px', resize: 'vertical' } });
+    var btnTxt = U.h('button', { class: 'tne-btn tne-btn-primary clickable', html: '⬆️ Importar texto colado', onclick: async function () {
       var ok = await processarGenesis(txt.value, data, app, 'genesis-texto');
       if (ok) txt.value = '';
     } });
-    var btnTxtLimpar = U.h('button', { class: 'tmg-btn tmg-btn-ghost clickable', html: '🧹 Limpar', onclick: function () { txt.value = ''; } });
+    var btnTxtLimpar = U.h('button', { class: 'tne-btn tne-btn-ghost clickable', html: '🧹 Limpar', onclick: function () { txt.value = ''; } });
     colCol.appendChild(txt);
     colCol.appendChild(U.h('div', { class: 'flex gap-2 flex-wrap' }, [btnTxt, btnTxtLimpar]));
     manualBody.appendChild(colCol);
@@ -401,20 +401,20 @@
     // RODAPÉ — limpar dados
     // =====================================================================
     container.appendChild(U.h('div', { class: 'flex gap-2 flex-wrap mt-7' }, [
-      U.h('button', { class: 'tmg-btn tmg-btn-ghost clickable', html: '🗑️ Limpar tarefas', onclick: function () {
+      U.h('button', { class: 'tne-btn tne-btn-ghost clickable', html: '🗑️ Limpar tarefas', onclick: function () {
         if (!confirm('Remover todas as tarefas carregadas?')) return;
         FS.clearTasks(); app.refresh(true).then(function () { app.render(); }); U.toast('Tarefas removidas.', 'ok');
       } }),
-      U.h('button', { class: 'tmg-btn tmg-btn-ghost clickable', html: '🗑️ Limpar incidentes', onclick: function () {
+      U.h('button', { class: 'tne-btn tne-btn-ghost clickable', html: '🗑️ Limpar incidentes', onclick: function () {
         if (!confirm('Remover todos os incidentes carregados?')) return;
         FS.clearIncidents(); app.refresh(true).then(function () { app.render(); }); U.toast('Incidentes removidos.', 'ok');
       } })
     ]));
   };
 
-  // título de seção com marcador colorido (reaproveita o ponto do tmg-chart-dot)
+  // título de seção com marcador colorido (reaproveita o ponto do tne-chart-dot)
   function secaoTitulo(texto, cor) {
-    return U.h('h2', { class: 'text-xs font-bold uppercase mb-3', style: { color: 'var(--tmg-muted)', letterSpacing: '1.2px', display: 'flex', alignItems: 'center', gap: '8px' } }, [
+    return U.h('h2', { class: 'text-xs font-bold uppercase mb-3', style: { color: 'var(--tne-muted)', letterSpacing: '1.2px', display: 'flex', alignItems: 'center', gap: '8px' } }, [
       U.h('span', { style: { width: '8px', height: '8px', borderRadius: '50%', background: cor, boxShadow: '0 0 10px ' + cor, display: 'inline-block', flexShrink: '0' } }),
       U.h('span', { text: texto })
     ]);
@@ -423,15 +423,15 @@
   // linha de info compacta (ícone + texto colorido) — usada nos status da
   // leitura automática (pasta conectada, intervalo, arquivamento).
   function infoRow(icone, texto, cor) {
-    var row = U.h('div', { class: 'text-xs flex items-center gap-2', style: { color: cor || 'var(--tmg-muted)' } }, [
-      U.h('span', { class: 'tmg-info-icon', text: icone }),
-      U.h('span', { class: 'tmg-info-text', text: texto })
+    var row = U.h('div', { class: 'text-xs flex items-center gap-2', style: { color: cor || 'var(--tne-muted)' } }, [
+      U.h('span', { class: 'tne-info-icon', text: icone }),
+      U.h('span', { class: 'tne-info-text', text: texto })
     ]);
     return row;
   }
   function setInfoRow(row, icone, texto, cor) {
-    row.style.color = cor || 'var(--tmg-muted)';
-    var ic = row.querySelector('.tmg-info-icon'); if (ic) ic.textContent = icone;
-    var tx = row.querySelector('.tmg-info-text'); if (tx) tx.textContent = texto;
+    row.style.color = cor || 'var(--tne-muted)';
+    var ic = row.querySelector('.tne-info-icon'); if (ic) ic.textContent = icone;
+    var tx = row.querySelector('.tne-info-text'); if (tx) tx.textContent = texto;
   }
-})(window.TMG = window.TMG || {});
+})(window.TNE = window.TNE || {});
