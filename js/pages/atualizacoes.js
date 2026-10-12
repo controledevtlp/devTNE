@@ -1,9 +1,9 @@
-﻿/* =====================================================================
+/* =====================================================================
  * atualizacoes.js — Análise do Diário de Trabalho (coluna BG)
  * ===================================================================== */
-(function (TNE) {
-  TNE.pages = TNE.pages || {};
-  var U = TNE.ui;
+(function (TMG) {
+  TMG.pages = TMG.pages || {};
+  var U = TMG.ui;
   var h = U.h;
   var _charts = [];
   var _stateAtu = {
@@ -66,7 +66,7 @@
   var RE_TLP_A    = /TLP-T\d+-([^-\r\n]{3,60}?)\s*-\s*(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}(?::\d{2})?)/g;
   var RE_DTNAME_A = /(\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2}(?::\d{2})?)\s*-\s*([^\r\n]{5,80})/g;
   var RE_TS_A     = /(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}\s+\d{1,2}:\d{2}(?::\d{2})?|\d{4}[\/\-]\d{2}[\/\-]\d{2}\s+\d{1,2}:\d{2}(?::\d{2})?|\d{1,2}[\/\-]\d{1,2}\s+\d{1,2}:\d{2}(?::\d{2})?|\d{1,2}:\d{2}(?::\d{2})?)/g;
-  var RE_BOT_A = /^(?:MONITOR\s*CCI|WFM\s*Agent|isoc_fixa|[Aa]utoma[çc][aã]o|Sistema\s*autom|System\b|Raio-X|dsoc_[a-z_]|taischatbot|\w+chatbot)|\(anota/i;
+  var RE_BOT_A = /^(?:MONITOR\s*CCI|WFM\s*Agent|isoc_fixa|[Aa]utoma[çc][aã]o|Sistema\s*autom|System\b|Raio-X|dsoc_[a-z_]|taischatbot|\w+chatbot)/i;
 
   function parseTlpEntriesA(texto) {
     if (!texto) return [];
@@ -78,8 +78,10 @@
     }
     RE_DTNAME_A.lastIndex = 0;
     while ((m = RE_DTNAME_A.exec(texto)) !== null) {
-      var nome = m[2].trim();
-      if (RE_BOT_A.test(nome)) continue;
+      // Remove sufixo "(Anotações de trabalho)" antes de checar bot — a plataforma
+      // acrescenta esse sufixo a TODOS os autores, inclusive humanos.
+      var nome = m[2].trim().replace(/\s*\([Aa]nota[çc][õo]es\s+de\s+trabalho\)/i, '').trim();
+      if (!nome || RE_BOT_A.test(nome)) continue;
       var p2 = m[1].trim().match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})(?::(\d{2}))?$/);
       if (!p2) continue;
       var dt2 = new Date(+p2[3], +p2[2]-1, +p2[1], +p2[4], +p2[5], p2[6]?+p2[6]:0);
@@ -285,13 +287,13 @@
   // ── Modal: drilldown autor → OSs que atualizou ────────────────────
   function abrirDrilldownAutor(authorName, osEntries) {
     if (!osEntries || !osEntries.length) {
-      U.openModal(authorName, h('div', { style: { color: 'var(--tne-muted)', padding: '16px' }, text: 'Nenhuma OS encontrada.' }));
+      U.openModal(authorName, h('div', { style: { color: 'var(--tmg-muted)', padding: '16px' }, text: 'Nenhuma OS encontrada.' }));
       return;
     }
     var total = osEntries.reduce(function (s, x) { return s + x.count; }, 0);
     var wrap = h('div', { style: { maxHeight: '65vh', overflowY: 'auto' } });
 
-    wrap.appendChild(h('div', { style: { padding: '8px 12px 12px', fontSize: '12px', color: 'var(--tne-muted)', borderBottom: '1px solid rgba(255,255,255,0.07)' } }, [
+    wrap.appendChild(h('div', { style: { padding: '8px 12px 12px', fontSize: '12px', color: 'var(--tmg-muted)', borderBottom: '1px solid rgba(255,255,255,0.07)' } }, [
       h('span', { text: total + ' atualização(ões) em ' + osEntries.length + ' OS' + (osEntries.length !== 1 ? 's' : '') })
     ]));
 
@@ -303,12 +305,12 @@
         onclick: function () { abrirTimeline(st); }
       }, [
         h('span', { style: { color: '#ff8c00', fontWeight: '700', fontSize: '12px', minWidth: '130px' }, text: st.task.osNumero || '—' }),
-        h('span', { style: { color: 'var(--tne-muted)', fontSize: '11px', flex: '1' }, text: st.task.status || '—' }),
-        h('span', { style: { fontSize: '11px', color: 'var(--tne-fg)', fontWeight: '600', minWidth: '28px', textAlign: 'right' }, text: entry.count + 'x' }),
-        h('span', { style: { color: 'var(--tne-muted)', fontSize: '11px', minWidth: '90px', textAlign: 'right' },
+        h('span', { style: { color: 'var(--tmg-muted)', fontSize: '11px', flex: '1' }, text: st.task.status || '—' }),
+        h('span', { style: { fontSize: '11px', color: 'var(--tmg-fg)', fontWeight: '600', minWidth: '28px', textAlign: 'right' }, text: entry.count + 'x' }),
+        h('span', { style: { color: 'var(--tmg-muted)', fontSize: '11px', minWidth: '90px', textAlign: 'right' },
           text: entry.lastDt ? fmtDDMM(entry.lastDt) + ' ' + fmtHM(entry.lastDt) : '—' }),
         h('button', {
-          class: 'tne-btn tne-btn-ghost',
+          class: 'tmg-btn tmg-btn-ghost',
           style: { fontSize: '10px', padding: '2px 8px', flexShrink: '0' },
           text: 'Timeline',
           onclick: function (e) { e.stopPropagation(); abrirTimeline(st); }
@@ -337,14 +339,14 @@
           cursor: osEntries ? 'pointer' : 'default', transition: 'background .15s ease' },
         onclick: osEntries ? (function (entries, name) { return function () { abrirDrilldownAutor(name, entries); }; })(osEntries, a.author) : null
       }, [
-        h('span', { style: { color: 'var(--tne-muted)', fontSize: '11px', width: '24px', textAlign: 'right' }, text: String(i + 1) }),
-        h('span', { style: { flex: '1', fontSize: '12px', fontWeight: isHl ? '700' : '400', color: isHl ? '#ff8c00' : 'var(--tne-fg)' }, text: a.author }),
+        h('span', { style: { color: 'var(--tmg-muted)', fontSize: '11px', width: '24px', textAlign: 'right' }, text: String(i + 1) }),
+        h('span', { style: { flex: '1', fontSize: '12px', fontWeight: isHl ? '700' : '400', color: isHl ? '#ff8c00' : 'var(--tmg-fg)' }, text: a.author }),
         h('div', { style: { width: '120px', background: 'rgba(255,255,255,0.06)', borderRadius: '3px', overflow: 'hidden' } }, [
           h('div', { style: { width: pctVal + '%', minWidth: '2px', height: '6px', background: isHl ? '#ff8c00' : '#3498db', borderRadius: '3px' } })
         ]),
         h('span', { style: { fontSize: '12px', color: '#ff8c00', fontWeight: '600', width: '32px', textAlign: 'right' }, text: String(a.count) }),
-        h('span', { style: { fontSize: '11px', color: 'var(--tne-muted)', width: '36px', textAlign: 'right' }, text: pctVal + '%' }),
-        osEntries ? h('span', { style: { color: 'var(--tne-muted)', fontSize: '12px', paddingLeft: '4px' }, text: '›' }) : h('span', { style: { width: '12px' } })
+        h('span', { style: { fontSize: '11px', color: 'var(--tmg-muted)', width: '36px', textAlign: 'right' }, text: pctVal + '%' }),
+        osEntries ? h('span', { style: { color: 'var(--tmg-muted)', fontSize: '12px', paddingLeft: '4px' }, text: '›' }) : h('span', { style: { width: '12px' } })
       ]);
       if (osEntries) {
         item.addEventListener('mouseenter', function () { item.style.background = 'rgba(255,140,0,0.08)'; });
@@ -414,22 +416,22 @@
 
   // ── Card: ranking geral/hoje com drilldown (substitui INTERVALO MÉDIO POR OS) ──
   function buildRankingCard(result) {
-    var card = h('div', { class: 'tne-card p-4', style: { display: 'flex', flexDirection: 'column', minHeight: '240px' } });
+    var card = h('div', { class: 'tmg-card p-4', style: { display: 'flex', flexDirection: 'column', minHeight: '240px' } });
 
     var headerRow = h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px', gap: '8px', flexWrap: 'wrap' } });
     var titleEl   = h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } }, [
-      h('span', { class: 'tne-chart-dot' }),
-      h('span', { style: { fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--tne-muted)' }, text: 'RANKING DE ATUALIZAÇÕES' })
+      h('span', { class: 'tmg-chart-dot' }),
+      h('span', { style: { fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--tmg-muted)' }, text: 'RANKING DE ATUALIZAÇÕES' })
     ]);
 
-    var btnGeral = h('button', { class: 'tne-btn tne-btn-primary',  style: { fontSize: '10px', padding: '2px 8px' }, text: 'Geral' });
-    var btnHoje  = h('button', { class: 'tne-btn tne-btn-ghost',    style: { fontSize: '10px', padding: '2px 8px' }, text: 'Hoje' });
+    var btnGeral = h('button', { class: 'tmg-btn tmg-btn-primary',  style: { fontSize: '10px', padding: '2px 8px' }, text: 'Geral' });
+    var btnHoje  = h('button', { class: 'tmg-btn tmg-btn-ghost',    style: { fontSize: '10px', padding: '2px 8px' }, text: 'Hoje' });
     var toggleEl = h('div', { style: { display: 'flex', gap: '4px' } }, [btnGeral, btnHoje]);
 
     function syncToggle() {
       var isGeral = _stateAtu.rankingView === 'geral';
-      btnGeral.className = 'tne-btn ' + (isGeral  ? 'tne-btn-primary' : 'tne-btn-ghost');
-      btnHoje.className  = 'tne-btn ' + (!isGeral ? 'tne-btn-primary' : 'tne-btn-ghost');
+      btnGeral.className = 'tmg-btn ' + (isGeral  ? 'tmg-btn-primary' : 'tmg-btn-ghost');
+      btnHoje.className  = 'tmg-btn ' + (!isGeral ? 'tmg-btn-primary' : 'tmg-btn-ghost');
       btnGeral.style.cssText = 'font-size:10px;padding:2px 8px';
       btnHoje.style.cssText  = 'font-size:10px;padding:2px 8px';
     }
@@ -443,7 +445,7 @@
       var osMap    = isHoje ? result.todayAuthorOSmap : result.authorOSmap;
 
       if (!authors || !authors.length) {
-        listEl.appendChild(h('div', { style: { color: 'var(--tne-muted)', fontSize: '12px', padding: '20px 8px', textAlign: 'center' },
+        listEl.appendChild(h('div', { style: { color: 'var(--tmg-muted)', fontSize: '12px', padding: '20px 8px', textAlign: 'center' },
           text: isHoje ? 'Nenhuma atualização registrada hoje.' : 'Sem dados.' }));
         return;
       }
@@ -461,14 +463,14 @@
         var row = h('div', {
           style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 6px', borderRadius: '6px', cursor: osEnt ? 'pointer' : 'default', transition: 'background .15s ease' }
         }, [
-          h('span', { style: { color: 'var(--tne-muted)', fontSize: '10px', width: '18px', textAlign: 'right', flexShrink: '0' }, text: String(i + 1) }),
+          h('span', { style: { color: 'var(--tmg-muted)', fontSize: '10px', width: '18px', textAlign: 'right', flexShrink: '0' }, text: String(i + 1) }),
           h('div', { style: { flex: '1', minWidth: '0' } }, [
             h('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: '3px', alignItems: 'center' } }, [
               h('span', { style: { fontSize: '11px', fontWeight: '500', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '160px' }, text: a.author }),
               h('div', { style: { display: 'flex', gap: '5px', alignItems: 'center', flexShrink: '0' } }, [
-                h('span', { style: { color: 'var(--tne-muted)', fontSize: '10px' }, text: pctVal + '%' }),
+                h('span', { style: { color: 'var(--tmg-muted)', fontSize: '10px' }, text: pctVal + '%' }),
                 h('span', { style: { color: '#ff8c00', fontWeight: '700', fontSize: '11px', minWidth: '20px', textAlign: 'right' }, text: String(a.count) }),
-                osEnt ? h('span', { style: { color: 'var(--tne-muted)', fontSize: '12px' }, text: '›' }) : h('span', { style: { width: '10px' } })
+                osEnt ? h('span', { style: { color: 'var(--tmg-muted)', fontSize: '12px' }, text: '›' }) : h('span', { style: { width: '10px' } })
               ])
             ]),
             h('div', { style: { background: 'rgba(255,255,255,0.06)', borderRadius: '3px', height: '5px', overflow: 'hidden' } }, barra)
@@ -487,7 +489,7 @@
       if (authors.length > 15) {
         listEl.appendChild(h('div', { style: { textAlign: 'center', paddingTop: '8px' } }, [
           h('button', {
-            class: 'tne-btn tne-btn-ghost',
+            class: 'tmg-btn tmg-btn-ghost',
             style: { fontSize: '10px', padding: '2px 10px' },
             text: 'Ver todos (' + authors.length + ')',
             onclick: function () { abrirRankingAutores(authors, null, osMap); }
@@ -512,11 +514,11 @@
     var entries = stat.entries;
     var wrap = h('div', { style: { maxHeight: '68vh', overflowY: 'auto', padding: '6px 4px' } });
 
-    wrap.appendChild(h('div', { class: 'tne-card p-3 mb-4 flex gap-6', style: { fontSize: '12px', flexWrap: 'wrap' } }, [
-      h('div', {}, [h('div', { style: { color: 'var(--tne-muted)', fontSize: '11px' }, text: 'ENTRADAS' }), h('div', { class: 'font-bold text-base', text: String(entries.length) })]),
-      h('div', {}, [h('div', { style: { color: 'var(--tne-muted)', fontSize: '11px' }, text: 'INTERVALO MÉDIO' }), h('div', { class: 'font-bold text-base', text: stat.avgGapH != null ? fmtGap(stat.avgGapH) : '—' })]),
-      h('div', {}, [h('div', { style: { color: 'var(--tne-muted)', fontSize: '11px' }, text: 'ÚLTIMA ATUALIZ.' }), h('div', { class: 'font-bold text-base', text: fmtDDMM(stat.lastDt) + ' ' + fmtHM(stat.lastDt) })]),
-      h('div', {}, [h('div', { style: { color: 'var(--tne-muted)', fontSize: '11px' }, text: 'STATUS' }), h('div', { class: 'font-bold text-base', text: stat.task.status || '—' })])
+    wrap.appendChild(h('div', { class: 'tmg-card p-3 mb-4 flex gap-6', style: { fontSize: '12px', flexWrap: 'wrap' } }, [
+      h('div', {}, [h('div', { style: { color: 'var(--tmg-muted)', fontSize: '11px' }, text: 'ENTRADAS' }), h('div', { class: 'font-bold text-base', text: String(entries.length) })]),
+      h('div', {}, [h('div', { style: { color: 'var(--tmg-muted)', fontSize: '11px' }, text: 'INTERVALO MÉDIO' }), h('div', { class: 'font-bold text-base', text: stat.avgGapH != null ? fmtGap(stat.avgGapH) : '—' })]),
+      h('div', {}, [h('div', { style: { color: 'var(--tmg-muted)', fontSize: '11px' }, text: 'ÚLTIMA ATUALIZ.' }), h('div', { class: 'font-bold text-base', text: fmtDDMM(stat.lastDt) + ' ' + fmtHM(stat.lastDt) })]),
+      h('div', {}, [h('div', { style: { color: 'var(--tmg-muted)', fontSize: '11px' }, text: 'STATUS' }), h('div', { class: 'font-bold text-base', text: stat.task.status || '—' })])
     ]));
 
     entries.forEach(function (entry, i) {
@@ -525,7 +527,7 @@
       var dotCor = isLast ? '#ff8c00' : isFirst ? '#2ecc71' : '#3498db';
 
       if (gapH !== null && gapH >= 0 && gapH < 720) {
-        var gapCor = gapH > 8 ? '#e74c3c' : gapH > 4 ? '#f39c12' : 'var(--tne-muted)';
+        var gapCor = gapH > 8 ? '#e74c3c' : gapH > 4 ? '#f39c12' : 'var(--tmg-muted)';
         wrap.appendChild(h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '3px 0 3px 18px' } }, [
           h('div', { style: { width: '2px', height: '18px', background: 'rgba(255,140,0,0.25)', marginLeft: '5px' } }),
           h('span', { style: { color: gapCor, fontSize: '11px', marginLeft: '10px', fontWeight: gapH > 4 ? '600' : '400' }, text: '+ ' + fmtGap(gapH) })
@@ -539,12 +541,12 @@
         h('div', { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: '0' } }, [
           h('div', { style: { width: '11px', height: '11px', borderRadius: '50%', background: dotCor, marginTop: '4px', flexShrink: '0', boxShadow: '0 0 0 2px ' + dotCor + '30' } })
         ]),
-        h('div', { class: 'tne-card p-3', style: { flex: '1', fontSize: '12px', marginBottom: '0' } }, [
+        h('div', { class: 'tmg-card p-3', style: { flex: '1', fontSize: '12px', marginBottom: '0' } }, [
           h('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: '5px', gap: '8px', flexWrap: 'wrap' } }, [
             h('span', { style: { color: dotCor, fontWeight: '700' }, text: fmtDDMM(entry.dt) + ' ' + fmtHM(entry.dt) }),
-            h('span', { style: { color: 'var(--tne-muted)', fontSize: '11px', textAlign: 'right' }, text: entry.author })
+            h('span', { style: { color: 'var(--tmg-muted)', fontSize: '11px', textAlign: 'right' }, text: entry.author })
           ]),
-          h('div', { style: { color: 'var(--tne-fg)', lineHeight: '1.55', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }, text: preview })
+          h('div', { style: { color: 'var(--tmg-fg)', lineHeight: '1.55', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }, text: preview })
         ])
       ]));
     });
@@ -562,15 +564,15 @@
   }
 
   // ── Página principal ──────────────────────────────────────────────
-  TNE.pages.atualizacoes = function (container, ctx) {
+  TMG.pages.atualizacoes = function (container, ctx) {
     var data = ctx && ctx.data;
     destroyLocalCharts();
 
     if (!data || !(data.tasksEnriched || []).length) {
-      container.appendChild(h('div', { class: 'tne-card p-8 text-center' }, [
+      container.appendChild(h('div', { class: 'tmg-card p-8 text-center' }, [
         h('div', { style: { fontSize: '2.2rem', marginBottom: '12px' }, text: '📝' }),
         h('div', { class: 'font-bold mb-2', text: 'Nenhum dado carregado' }),
-        h('div', { style: { color: 'var(--tne-muted)', fontSize: '13px' },
+        h('div', { style: { color: 'var(--tmg-muted)', fontSize: '13px' },
           text: 'Importe a planilha pela aba "Importar dados" para analisar o diário de trabalho.' })
       ]));
       return;
@@ -596,8 +598,8 @@
         placeholder: 'ex: 30',
         style: {
           width: '68px', padding: '3px 8px', borderRadius: '6px', fontSize: '11px',
-          border: '1px solid rgba(255,255,255,0.15)', background: 'var(--tne-bg-card)',
-          color: 'var(--tne-fg)', outline: 'none', textAlign: 'center'
+          border: '1px solid rgba(255,255,255,0.15)', background: 'var(--tmg-bg-card)',
+          color: 'var(--tmg-fg)', outline: 'none', textAlign: 'center'
         },
         oninput: function () { this.value = this.value.replace(/[^0-9]/g, ''); },
         onchange: function () {
@@ -609,7 +611,7 @@
       });
 
       var btnTodos = h('button', {
-        class: 'tne-btn ' + (!_stateAtu.periodo ? 'tne-btn-primary' : 'tne-btn-ghost'),
+        class: 'tmg-btn ' + (!_stateAtu.periodo ? 'tmg-btn-primary' : 'tmg-btn-ghost'),
         style: { fontSize: '11px', padding: '3px 10px' },
         text: 'Todos',
         onclick: function () { _stateAtu.periodo = 0; periodoInput.value = ''; render(); }
@@ -618,7 +620,7 @@
       // Prioridades: multi-select
       var prios = ['P1', 'P2', 'P3', 'P4', 'P5', 'PREDITIVA'];
       var btnTodas = h('button', {
-        class: 'tne-btn ' + (!_stateAtu.prioridades.length ? 'tne-btn-primary' : 'tne-btn-ghost'),
+        class: 'tmg-btn ' + (!_stateAtu.prioridades.length ? 'tmg-btn-primary' : 'tmg-btn-ghost'),
         style: { fontSize: '11px', padding: '3px 10px' },
         text: 'Todas',
         onclick: function () { _stateAtu.prioridades = []; render(); }
@@ -626,7 +628,7 @@
       var chipsPrio = prios.map(function (p) {
         var ativo = _stateAtu.prioridades.indexOf(p) >= 0;
         return h('button', {
-          class: 'tne-btn ' + (ativo ? 'tne-btn-primary' : 'tne-btn-ghost'),
+          class: 'tmg-btn ' + (ativo ? 'tmg-btn-primary' : 'tmg-btn-ghost'),
           style: { fontSize: '11px', padding: '3px 10px' },
           text: p,
           onclick: function () {
@@ -638,16 +640,16 @@
         });
       });
 
-      areaEl.appendChild(h('div', { class: 'tne-card p-3 mb-5', style: { borderColor: 'rgba(255,140,0,0.2)' } }, [
+      areaEl.appendChild(h('div', { class: 'tmg-card p-3 mb-5', style: { borderColor: 'rgba(255,140,0,0.2)' } }, [
         h('div', { class: 'flex items-center gap-3 flex-wrap mb-2' }, [
-          h('span', { style: { color: 'var(--tne-muted)', fontSize: '12px', fontWeight: '600' }, text: 'PERÍODO:' }),
+          h('span', { style: { color: 'var(--tmg-muted)', fontSize: '12px', fontWeight: '600' }, text: 'PERÍODO:' }),
           h('div', { class: 'flex gap-2 items-center' }, [
             btnTodos, periodoInput,
-            h('span', { style: { color: 'var(--tne-muted)', fontSize: '11px' }, text: 'dias' })
+            h('span', { style: { color: 'var(--tmg-muted)', fontSize: '11px' }, text: 'dias' })
           ])
         ]),
         h('div', { class: 'flex items-center gap-3 flex-wrap' }, [
-          h('span', { style: { color: 'var(--tne-muted)', fontSize: '12px', fontWeight: '600' }, text: 'PRIORIDADE:' }),
+          h('span', { style: { color: 'var(--tmg-muted)', fontSize: '12px', fontWeight: '600' }, text: 'PRIORIDADE:' }),
           h('div', { class: 'flex gap-2 flex-wrap' }, [btnTodas].concat(chipsPrio))
         ])
       ]));
@@ -696,7 +698,7 @@
         U.kpiCard({ label: 'Abertas s/ Atualiz. +4h', value: abertas4h,
           cor: abertas4h > 0 ? '#e74c3c' : '#2ecc71', sub: 'requerem atenção agora' }),
         U.kpiCard({ label: 'Atualizações Hoje', value: String(hoje),
-          cor: hoje > 0 ? '#2ecc71' : 'var(--tne-muted)', sub: result.todayAuthors.length + ' autor(es) hoje' })
+          cor: hoje > 0 ? '#2ecc71' : 'var(--tmg-muted)', sub: result.todayAuthors.length + ' autor(es) hoje' })
       ]));
 
       // ── Gráficos ──────────────────────────────────────────────────
@@ -721,7 +723,7 @@
       if (result.topAuthors.length > 12) {
         areaEl.appendChild(h('div', { class: 'flex justify-end mb-4', style: { marginTop: '-12px' } }, [
           h('button', {
-            class: 'tne-btn tne-btn-ghost',
+            class: 'tmg-btn tmg-btn-ghost',
             style: { fontSize: '11px', padding: '3px 12px' },
             text: 'Ver ranking completo (' + result.topAuthors.length + ' autores)',
             onclick: function () { abrirRankingAutores(result.topAuthors, null, result.authorOSmap); }
@@ -737,7 +739,7 @@
 
       // ── OSs ABERTAS (somente Não iniciado / Iniciado) ─────────────
       areaEl.appendChild(secTitle('OSs ABERTAS — TEMPO SEM ATUALIZAÇÃO', '#e74c3c'));
-      areaEl.appendChild(h('div', { style: { color: 'var(--tne-muted)', fontSize: '12px', marginBottom: '10px' },
+      areaEl.appendChild(h('div', { style: { color: 'var(--tmg-muted)', fontSize: '12px', marginBottom: '10px' },
         text: 'Apenas OSs com status "Não iniciado" ou "Iniciado". Clique para abrir a timeline.' }));
 
       var riskRows = s.filter(function (st) {
@@ -746,13 +748,13 @@
       }).slice(0, 50);
 
       if (!riskRows.length) {
-        areaEl.appendChild(h('div', { class: 'tne-card p-5 text-center', style: { color: 'var(--tne-muted)', fontSize: '13px' },
+        areaEl.appendChild(h('div', { class: 'tmg-card p-5 text-center', style: { color: 'var(--tmg-muted)', fontSize: '13px' },
           text: 'Nenhuma OS com status "Não iniciado" ou "Iniciado" e diário preenchido encontrada.' }));
       } else {
-        var tbl = h('div', { class: 'tne-card', style: { overflowX: 'auto' } });
+        var tbl = h('div', { class: 'tmg-card', style: { overflowX: 'auto' } });
         var table = h('table', { style: { width: '100%', fontSize: '12px', borderCollapse: 'collapse' } });
         var thead = h('thead', {});
-        thead.appendChild(h('tr', { style: { borderBottom: '1px solid rgba(255,140,0,0.2)', color: 'var(--tne-muted)', textAlign: 'left', fontSize: '11px' } }, [
+        thead.appendChild(h('tr', { style: { borderBottom: '1px solid rgba(255,140,0,0.2)', color: 'var(--tmg-muted)', textAlign: 'left', fontSize: '11px' } }, [
           h('th', { style: { padding: '8px 12px', fontWeight: '600' }, text: 'OS' }),
           h('th', { style: { padding: '8px 12px', fontWeight: '600' }, text: 'NE ID' }),
           h('th', { style: { padding: '8px 12px', fontWeight: '600' }, text: 'Status' }),
@@ -769,7 +771,7 @@
         riskRows.forEach(function (st) {
           var urgente = st.horasSemUpd > 8;
           var atencao = st.horasSemUpd > 4;
-          var cor    = urgente ? '#e74c3c' : atencao ? '#f39c12' : 'var(--tne-muted)';
+          var cor    = urgente ? '#e74c3c' : atencao ? '#f39c12' : 'var(--tmg-muted)';
           var rowBg  = urgente ? 'rgba(231,76,60,0.05)' : atencao ? 'rgba(243,156,18,0.04)' : 'transparent';
           var isPred = st.task.statusSla === 'PREDITIVA' || st.task.fonteSla === 'PREDITIVA';
 
@@ -778,16 +780,16 @@
             onclick: function () { abrirTimeline(st); }
           }, [
             h('td', { style: { padding: '8px 12px', color: '#ff8c00', fontWeight: '600' }, text: st.task.osNumero || '—' }),
-            h('td', { style: { padding: '8px 12px', color: 'var(--tne-muted)', fontSize: '11px' }, text: String(st.task.enderecoId || '—') }),
+            h('td', { style: { padding: '8px 12px', color: 'var(--tmg-muted)', fontSize: '11px' }, text: String(st.task.enderecoId || '—') }),
             h('td', { style: { padding: '8px 12px' }, text: st.task.status || '—' }),
             h('td', { style: { padding: '8px 12px' }, text: isPred ? 'PREDITIVA' : (st.task.prioridade || '—') }),
-            h('td', { style: { padding: '8px 12px', color: 'var(--tne-muted)' }, text: fmtDDMM(st.lastDt) + ' às ' + fmtHM(st.lastDt) }),
+            h('td', { style: { padding: '8px 12px', color: 'var(--tmg-muted)' }, text: fmtDDMM(st.lastDt) + ' às ' + fmtHM(st.lastDt) }),
             h('td', { style: { padding: '8px 12px', color: cor, fontWeight: urgente ? '700' : '400' }, text: fmtGap(st.horasSemUpd) }),
-            h('td', { style: { padding: '8px 12px', color: 'var(--tne-muted)', textAlign: 'center' }, text: String(st.nEntries) }),
-            h('td', { style: { padding: '8px 12px', color: 'var(--tne-muted)' }, text: st.avgGapH != null ? fmtGap(st.avgGapH) : '—' }),
+            h('td', { style: { padding: '8px 12px', color: 'var(--tmg-muted)', textAlign: 'center' }, text: String(st.nEntries) }),
+            h('td', { style: { padding: '8px 12px', color: 'var(--tmg-muted)' }, text: st.avgGapH != null ? fmtGap(st.avgGapH) : '—' }),
             h('td', { style: { padding: '8px 12px' } }, [
               h('button', {
-                class: 'tne-btn tne-btn-ghost',
+                class: 'tmg-btn tmg-btn-ghost',
                 style: { fontSize: '11px', padding: '2px 10px' },
                 text: 'Ver timeline',
                 onclick: function (e) { e.stopPropagation(); abrirTimeline(st); }
@@ -802,10 +804,10 @@
       }
 
       if (s.length > riskRows.length) {
-        areaEl.appendChild(h('div', { class: 'tne-card p-4 mt-4', style: { fontSize: '12px', color: 'var(--tne-muted)', textAlign: 'center' } }, [
+        areaEl.appendChild(h('div', { class: 'tmg-card p-4 mt-4', style: { fontSize: '12px', color: 'var(--tmg-muted)', textAlign: 'center' } }, [
           h('span', { text: 'Exibindo OSs com status Não iniciado / Iniciado. ' }),
           h('button', {
-            class: 'tne-btn tne-btn-ghost',
+            class: 'tmg-btn tmg-btn-ghost',
             style: { fontSize: '11px', padding: '2px 10px', display: 'inline-flex' },
             text: 'Ver todas (' + s.length + ') incluindo outros status',
             onclick: function () { mostrarTodasModal(s); }
@@ -827,13 +829,13 @@
         onclick: function () { abrirTimeline(st); }
       }, [
         h('span', { style: { color: '#ff8c00', fontWeight: '600', fontSize: '12px' }, text: st.task.osNumero || '—' }),
-        h('span', { style: { color: 'var(--tne-muted)', fontSize: '11px' }, text: st.task.status || '—' }),
+        h('span', { style: { color: 'var(--tmg-muted)', fontSize: '11px' }, text: st.task.status || '—' }),
         h('span', { style: { fontSize: '11px' }, text: st.nEntries + ' entradas' }),
-        h('span', { style: { color: 'var(--tne-muted)', fontSize: '11px' }, text: fmtGap(st.horasSemUpd) + ' atrás' })
+        h('span', { style: { color: 'var(--tmg-muted)', fontSize: '11px' }, text: fmtGap(st.horasSemUpd) + ' atrás' })
       ]);
       wrap.appendChild(item);
     });
     U.openModal('Todas as OSs com Diário (' + stats.length + ')', wrap);
   }
 
-})(window.TNE = window.TNE || {});
+})(window.TMG = window.TMG || {});

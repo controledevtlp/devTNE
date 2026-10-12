@@ -1,19 +1,17 @@
-/* Constantes operacionais do sistema TNE (Nordeste) */
-(function (TNE) {
+/* Constantes operacionais do sistema TMG (adaptado do controle-operacional TMG) */
+(function (TMG) {
   var C = {};
 
-  /* Regiões = estados do Nordeste cobertos pelo contrato TNE */
-  C.REGIOES = ['PE', 'PB', 'CE', 'RN', 'PI', 'SE', 'AL', 'BA', 'OTHERS'];
+  C.REGIOES = ['ANF31', 'ANF32', 'ANF33', 'ANF34', 'ANF35', 'ANF37', 'ANF38', 'OTHERS'];
 
   C.REGIAO_LABELS = {
-    PE: 'Pernambuco',
-    PB: 'Paraíba',
-    CE: 'Ceará',
-    RN: 'Rio Grande do Norte',
-    PI: 'Piauí',
-    SE: 'Sergipe',
-    AL: 'Alagoas',
-    BA: 'Bahia',
+    ANF31: 'ANF 31',
+    ANF32: 'ANF 32',
+    ANF33: 'ANF 33',
+    ANF34: 'ANF 34',
+    ANF35: 'ANF 35',
+    ANF37: 'ANF 37',
+    ANF38: 'ANF 38',
     OTHERS: 'Outros'
   };
 
@@ -21,17 +19,16 @@
 
   C.SLA_PADRAO_HORAS = { P1: 4, P2: 6, P3: 12, P4: 24, P5: 48 };
 
-  C.ANF_LIST = ['PE', 'PB', 'CE', 'RN', 'PI', 'SE', 'AL', 'BA'];
+  C.ANF_LIST = ['31', '32', '33', '34', '35', '37', '38'];
 
   C.ANF_LABELS = {
-    'PE': 'PE – Pernambuco',
-    'PB': 'PB – Paraíba',
-    'CE': 'CE – Ceará',
-    'RN': 'RN – Rio Grande do Norte',
-    'PI': 'PI – Piauí',
-    'SE': 'SE – Sergipe',
-    'AL': 'AL – Alagoas',
-    'BA': 'BA – Bahia'
+    '31': 'ANF 31 – Grande BH / Metalúrgica',
+    '32': 'ANF 32 – Zona da Mata / Sul',
+    '33': 'ANF 33 – Vale do Rio Doce / Leste',
+    '34': 'ANF 34 – Triângulo Mineiro / Alto Paranaíba',
+    '35': 'ANF 35 – Sul de Minas',
+    '37': 'ANF 37 – Centro-Oeste de MG',
+    '38': 'ANF 38 – Norte / Noroeste de MG'
   };
 
   C.GSBI_LIST = ['GOLD', 'SILVER', 'BRONZE', 'IRON'];
@@ -66,9 +63,9 @@
     { label: '> 6h', min: 360, max: Infinity, cor: '#3498db' }
   ];
 
-  C.CORES_TNE = { orange: '#ff8c00', orange2: '#ffb347', red: '#e74c3c', green: '#2ecc71', blue: '#3498db' };
+  C.CORES_TMG = { orange: '#ff8c00', orange2: '#ffb347', red: '#e74c3c', green: '#2ecc71', blue: '#3498db' };
 
   C.DONUT_CORES = ['#ff8c00', '#ffb347', '#ff6b35', '#9aa5b1'];
 
-  TNE.constants = C;
-})(window.TNE = window.TNE || {});
+  TMG.constants = C;
+})(window.TMG = window.TMG || {});

@@ -1,10 +1,10 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Controle TNE — Operacional</title>
-  <link rel="icon" href="assets/logo-tne.png" />
+  <title>Controle TMG — Operacional</title>
+  <link rel="icon" href="assets/logo-tmg.png" />
 
   <!-- Tailwind (CDN) -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -37,21 +37,21 @@
 
   <!-- ================= TELA DE LOGIN ================= -->
   <div id="login-screen" style="display:none; min-height:100vh; align-items:center; justify-content:center; padding:16px;">
-    <div class="tne-card" style="width:100%; max-width:400px; padding:32px;">
+    <div class="tmg-card" style="width:100%; max-width:400px; padding:32px;">
       <div style="text-align:center; margin-bottom:24px;">
-        <img src="assets/logo-tne.png" alt="TNE" style="width:64px; height:64px; object-fit:contain; margin:0 auto 12px;" onerror="this.style.display='none'" />
-        <h1 style="font-size:20px; font-weight:800; color:var(--tne-primary);">Controle Operacional TNE</h1>
-        <p style="font-size:13px; color:var(--tne-muted); margin-top:4px;">Telecom NE</p>
+        <img src="assets/logo-tmg.png" alt="TMG" style="width:64px; height:64px; object-fit:contain; margin:0 auto 12px;" onerror="this.src='assets/logo-tmg.png'" />
+        <h1 style="font-size:20px; font-weight:800; color:var(--tmg-primary);">Controle Operacional TMG</h1>
+        <p style="font-size:13px; color:var(--tmg-muted); margin-top:4px;">Telecom MG</p>
       </div>
       <form id="login-form">
-        <label style="font-size:13px; color:var(--tne-muted);">E-mail</label>
-        <input id="login-email" type="email" class="tne-input" style="margin:6px 0 14px;" autocomplete="username" required />
-        <label style="font-size:13px; color:var(--tne-muted);">Senha</label>
-        <input id="login-pwd" type="password" class="tne-input" style="margin:6px 0 18px;" autocomplete="current-password" required />
-        <button id="login-btn" type="submit" class="tne-btn tne-btn-primary" style="width:100%;">Entrar</button>
+        <label style="font-size:13px; color:var(--tmg-muted);">E-mail</label>
+        <input id="login-email" type="email" class="tmg-input" style="margin:6px 0 14px;" autocomplete="username" required />
+        <label style="font-size:13px; color:var(--tmg-muted);">Senha</label>
+        <input id="login-pwd" type="password" class="tmg-input" style="margin:6px 0 18px;" autocomplete="current-password" required />
+        <button id="login-btn" type="submit" class="tmg-btn tmg-btn-primary" style="width:100%;">Entrar</button>
         <p id="login-error" style="color:#e74c3c; font-size:13px; margin-top:12px; text-align:center; min-height:18px;"></p>
       </form>
-      <p style="font-size:11px; color:var(--tne-muted); text-align:center; margin-top:10px;">Acesso restrito — entre com suas credenciais.</p>
+      <p style="font-size:11px; color:var(--tmg-muted); text-align:center; margin-top:10px;">Acesso restrito — entre com suas credenciais.</p>
     </div>
   </div>
 

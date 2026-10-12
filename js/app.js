@@ -1,4 +1,4 @@
-﻿/* =====================================================================
+/* =====================================================================
  * app.js  —  NÚCLEO DA APLICAÇÃO (bootstrap + rotas + cache de dados)
  * ---------------------------------------------------------------------
  * - Verifica login; mostra a tela de login ou o painel.
@@ -7,13 +7,13 @@
  * - As abas de visualização só aparecem depois que os arquivos são
  *   carregados (apenas "Importar dados" e "Configurações" no início).
  * ===================================================================== */
-(function (TNE) {
-  var U = TNE.ui, D = TNE.domain, Comp = TNE.compute, C = TNE.constants;
+(function (TMG) {
+  var U = TMG.ui, D = TMG.domain, Comp = TMG.compute, C = TMG.constants;
   var App = { data: null };
 
   // ícones SVG simples (stroke currentColor)
   // ---------------- TEMA (claro/escuro) ----------------
-  var LS_THEME = 'tne_theme';
+  var LS_THEME = 'tmg_theme';
   function getTheme() { try { return localStorage.getItem(LS_THEME) || 'dark'; } catch (e) { return 'dark'; } }
   function applyTheme(t) {
     document.documentElement.setAttribute('data-theme', t === 'light' ? 'light' : 'dark');
@@ -77,7 +77,7 @@
       err.textContent = '';
       btn.disabled = true; btn.textContent = 'Entrando...';
       try {
-        await TNE.auth.login(email, pwd);
+        await TMG.auth.login(email, pwd);
         await startApp();
       } catch (e) {
         err.textContent = e.message || 'Falha no login.';
@@ -89,27 +89,27 @@
 
   // ---------------- SHELL ----------------
   function buildSidebar() {
-    var user = TNE.auth.getUser() || {};
+    var user = TMG.auth.getUser() || {};
     var brand = U.h('div', { class: 'flex items-center gap-3 px-4 py-4' }, [
-      U.h('img', { src: 'assets/logo-tne.png', alt: 'TNE', style: { width: '38px', height: '38px', objectFit: 'contain' } }),
+      U.h('img', { src: 'assets/logo-tmg.png', alt: 'TMG', style: { width: '38px', height: '38px', objectFit: 'contain' } }),
       U.h('div', null, [
-        U.h('div', { class: 'font-extrabold text-sm', style: { color: 'var(--tne-primary)', letterSpacing: '.5px' }, text: TNE.config.APP_NAME || 'Controle TNE' }),
-        U.h('div', { class: 'text-xs', style: { color: 'var(--tne-muted)' }, text: TNE.config.APP_SUB || 'Operacional' })
+        U.h('div', { class: 'font-extrabold text-sm', style: { color: 'var(--tmg-primary)', letterSpacing: '.5px' }, text: TMG.config.APP_NAME || 'CONTROLE TMG' }),
+        U.h('div', { class: 'text-xs', style: { color: 'var(--tmg-muted)' }, text: TMG.config.APP_SUB || 'Operacional' })
       ])
     ]);
     var hasTasks = App.data && App.data.rawTasks && App.data.rawTasks.length > 0;
     var visibleLinks = hasTasks ? LINKS : LINKS.filter(function (l) { return l.hash === '#/importar' || l.hash === '#/configuracoes'; });
     var nav = U.h('nav', { class: 'flex flex-col gap-1 px-3 mt-2', style: { flex: '1' } }, visibleLinks.map(function (l) {
-      return U.h('a', { class: 'tne-link', href: l.hash, dataset: { hash: l.hash } }, [
+      return U.h('a', { class: 'tmg-link', href: l.hash, dataset: { hash: l.hash } }, [
         U.h('span', { class: 'ico', html: icon(l.ico) }), U.h('span', { text: l.label })
       ]);
     }));
     if (!hasTasks) {
-      nav.appendChild(U.h('div', { class: 'text-xs px-2 pt-2', style: { color: 'var(--tne-muted)', lineHeight: '1.4' }, text: 'Faça o upload dos arquivos para liberar as abas de visualização.' }));
+      nav.appendChild(U.h('div', { class: 'text-xs px-2 pt-2', style: { color: 'var(--tmg-muted)', lineHeight: '1.4' }, text: 'Faça o upload dos arquivos para liberar as abas de visualização.' }));
     }
     var temaAtual = getTheme();
     var btnTema = U.h('button', {
-      class: 'tne-link w-full', onclick: function () {
+      class: 'tmg-link w-full', onclick: function () {
         var novo = getTheme() === 'light' ? 'dark' : 'light';
         applyTheme(novo);
         buildShell(); render(); // refaz o menu (ícone/label do tema) e a página atual
@@ -119,19 +119,19 @@
       U.h('span', { text: temaAtual === 'light' ? 'Tema escuro' : 'Tema claro' })
     ]);
     var btnLinkPublico = U.h('button', {
-      class: 'tne-link w-full', title: 'Copiar o link de visualização pública do Dashboard',
+      class: 'tmg-link w-full', title: 'Copiar o link de visualização pública do Dashboard',
       onclick: function () {
         var url = location.href.replace(/index\.html.*$/, '').replace(/\/?(#.*)?$/, '/') + 'dashboard-publico.html';
         if (navigator.clipboard) navigator.clipboard.writeText(url).then(function () { U.toast('Link público copiado!', 'ok'); }, function () { U.toast(url, 'info'); });
       }
     }, [U.h('span', { class: 'ico', text: '🔗' }), U.h('span', { text: 'Copiar link público' })]);
-    var footer = U.h('div', { class: 'px-3 py-3', style: { borderTop: '1px solid var(--tne-border)' } }, [
-      U.h('div', { class: 'text-xs px-2 mb-2 truncate', style: { color: 'var(--tne-muted)' }, text: user.email || '' }),
+    var footer = U.h('div', { class: 'px-3 py-3', style: { borderTop: '1px solid var(--tmg-border)' } }, [
+      U.h('div', { class: 'text-xs px-2 mb-2 truncate', style: { color: 'var(--tmg-muted)' }, text: user.email || '' }),
       btnLinkPublico,
       btnTema,
-      U.h('button', { class: 'tne-link w-full', onclick: doLogout }, [U.h('span', { class: 'ico', html: icon('logout') }), U.h('span', { text: 'Sair' })])
+      U.h('button', { class: 'tmg-link w-full', onclick: doLogout }, [U.h('span', { class: 'ico', html: icon('logout') }), U.h('span', { text: 'Sair' })])
     ]);
-    return U.h('aside', { id: 'sidebar', class: 'tne-card flex flex-col', style: { width: '256px', minWidth: '256px', borderRadius: '0', borderTop: 'none', borderBottom: 'none', borderLeft: 'none', height: '100vh' } }, [brand, nav, footer]);
+    return U.h('aside', { id: 'sidebar', class: 'tmg-card flex flex-col', style: { width: '256px', minWidth: '256px', borderRadius: '0', borderTop: 'none', borderBottom: 'none', borderLeft: 'none', height: '100vh' } }, [brand, nav, footer]);
   }
 
   // ---------------- Comportamento do menu (hover na borda + botão p/ touch) ----------------
@@ -141,17 +141,17 @@
 
   function openSidebar() {
     if (sidebarCloseTimer) { clearTimeout(sidebarCloseTimer); sidebarCloseTimer = null; }
-    document.body.classList.add('tne-sidebar-open');
+    document.body.classList.add('tmg-sidebar-open');
   }
   function closeSidebarSoon() {
     if (sidebarPinned) return; // só fecha automaticamente se não foi fixado pelo botão
     if (sidebarCloseTimer) clearTimeout(sidebarCloseTimer);
-    sidebarCloseTimer = setTimeout(function () { document.body.classList.remove('tne-sidebar-open'); }, SIDEBAR_CLOSE_DELAY);
+    sidebarCloseTimer = setTimeout(function () { document.body.classList.remove('tmg-sidebar-open'); }, SIDEBAR_CLOSE_DELAY);
   }
   function closeSidebarNow() {
     sidebarPinned = false;
     if (sidebarCloseTimer) { clearTimeout(sidebarCloseTimer); sidebarCloseTimer = null; }
-    document.body.classList.remove('tne-sidebar-open');
+    document.body.classList.remove('tmg-sidebar-open');
   }
   function toggleSidebarPinned() {
     sidebarPinned = !sidebarPinned;
@@ -169,11 +169,11 @@
     document.body.appendChild(toggleBtn);
   }
 
-  function doLogout() { if (TNE.files && TNE.files.stopAutoMonitor) TNE.files.stopAutoMonitor(); if (App._timer) { clearInterval(App._timer); App._timer = null; } TNE.auth.logout(); location.hash = '#/dashboard'; showLogin(); }
+  function doLogout() { if (TMG.files && TMG.files.stopAutoMonitor) TMG.files.stopAutoMonitor(); if (App._timer) { clearInterval(App._timer); App._timer = null; } TMG.auth.logout(); location.hash = '#/dashboard'; showLogin(); }
 
   function setActiveLink() {
     var cur = location.hash || '#/dashboard';
-    document.querySelectorAll('#sidebar .tne-link[data-hash]').forEach(function (a) {
+    document.querySelectorAll('#sidebar .tmg-link[data-hash]').forEach(function (a) {
       a.classList.toggle('active', a.dataset.hash === cur);
     });
   }
@@ -187,7 +187,7 @@
     sidebar.addEventListener('mouseenter', openSidebar);
     sidebar.addEventListener('mouseleave', closeSidebarSoon);
     // ao escolher uma aba, prioriza o conteúdo: fecha o menu (inclusive se fixado pelo botão)
-    sidebar.querySelectorAll('.tne-link[data-hash]').forEach(function (a) {
+    sidebar.querySelectorAll('.tmg-link[data-hash]').forEach(function (a) {
       a.addEventListener('click', closeSidebarNow);
     });
     var page = U.h('div', { id: 'page', class: 'p-4 lg:p-6', style: { paddingTop: '54px' } });
@@ -198,7 +198,7 @@
   }
 
   // ---------------- CACHE VALID_CAD ----------------
-  var LS_VMAP = 'tne_validMap_v1';
+  var LS_VMAP = 'tmg_validMap_v1';
   var VMAP_TTL = 30 * 60 * 1000; // 30 minutos
 
   function _vmapLoad() {
@@ -228,10 +228,10 @@
   App.refreshValidMap = async function () {
     App.invalidateValidMap();
     try {
-      var rawTasks = (TNE.files && TNE.files.getTasks()) || [];
-      var rawInc   = (TNE.files && TNE.files.getIncidents()) || [];
+      var rawTasks = (TMG.files && TMG.files.getTasks()) || [];
+      var rawInc   = (TMG.files && TMG.files.getIncidents()) || [];
       var ids = Comp.collectIds(rawTasks, rawInc);
-      var lk = ids.length ? await TNE.api.lookupCities(ids) : { map: {} };
+      var lk = ids.length ? await TMG.api.lookupCities(ids) : { map: {} };
       var map = (lk && lk.map) || {};
       _vmapSave(map);
       if (App.data) {
@@ -259,10 +259,10 @@
   App.loadAll = async function (forceMapRefresh) {
     U.loading(true);
     try {
-      var cfgRes = await TNE.api.getConfig();
+      var cfgRes = await TMG.api.getConfig();
       var config = (cfgRes && cfgRes.config) || {};
-      var rawTasks = (TNE.files && TNE.files.getTasks()) || [];
-      var rawInc = (TNE.files && TNE.files.getIncidents()) || [];
+      var rawTasks = (TMG.files && TMG.files.getTasks()) || [];
+      var rawInc = (TMG.files && TMG.files.getIncidents()) || [];
       var prazoMap = D.montarPrazoMap(prazoOverride(config));
       var ids = Comp.collectIds(rawTasks, rawInc);
       var validMap = {};
@@ -277,7 +277,7 @@
           var _missingIds = ids.filter(function (id) { return !cached[id]; });
           if (_missingIds.length) {
             try {
-              var _lkD = await TNE.api.lookupCities(_missingIds);
+              var _lkD = await TMG.api.lookupCities(_missingIds);
               if (_lkD && _lkD.map && Object.keys(_lkD.map).length) {
                 validMap = Object.assign({}, cached, _lkD.map);
                 _vmapSave(validMap);
@@ -287,7 +287,7 @@
           }
         } else {
           try {
-            var lk = await TNE.api.lookupCities(ids);
+            var lk = await TMG.api.lookupCities(ids);
             validMap = (lk && lk.map) || {};
             _vmapSave(validMap);
           } catch (e) {
@@ -327,14 +327,14 @@
 
   // registra o monitor automático apenas uma vez (idempotente em files.js)
   function ensureMonitor() {
-    if (TNE.files && TNE.files.startAutoMonitor) {
-      TNE.files.startAutoMonitor(function () { App.refresh(true); }, 45000);
+    if (TMG.files && TMG.files.startAutoMonitor) {
+      TMG.files.startAutoMonitor(function () { App.refresh(true); }, 45000);
     }
   }
 
   // recarrega só incidentes (após upload/alteração de status) — agora da memória/navegador
   App.reloadIncidents = async function () {
-    var rawInc = (TNE.files && TNE.files.getIncidents()) || [];
+    var rawInc = (TMG.files && TMG.files.getIncidents()) || [];
     App.data.rawInc = rawInc;
     App.data.incidentsEnriched = Comp.enrichIncidents(rawInc, App.data.validMap);
   };
@@ -373,10 +373,10 @@
   };
 
   // Resolve a página registrada aceitando os dois formatos:
-  //   TNE.pages.x = function(container, ctx) {...}
-  //   TNE.pages.x = { render: function(container, ctx) {...} }
+  //   TMG.pages.x = function(container, ctx) {...}
+  //   TMG.pages.x = { render: function(container, ctx) {...} }
   function resolvePage(key) {
-    var p = TNE.pages && TNE.pages[key];
+    var p = TMG.pages && TMG.pages[key];
     if (!p) return null;
     if (typeof p === 'function') return p;
     if (typeof p.render === 'function') return p.render.bind(p);
@@ -384,7 +384,7 @@
   }
 
   function render() {
-    if (!TNE.auth.isLogged()) { showLogin(); return; }
+    if (!TMG.auth.isLogged()) { showLogin(); return; }
     var page = document.getElementById('page');
     if (!page) return;
     U.destroyCharts();
@@ -398,9 +398,9 @@
     page.innerHTML = '';
     if (typeof fn === 'function') {
       try { fn(page, { data: App.data, app: App }); }
-      catch (e) { page.appendChild(U.h('div', { class: 'tne-card p-6', style: { color: 'var(--tne-red, #e74c3c)' }, text: 'Erro ao renderizar a página: ' + (e.message || e) })); }
+      catch (e) { page.appendChild(U.h('div', { class: 'tmg-card p-6', style: { color: 'var(--tmg-red, #e74c3c)' }, text: 'Erro ao renderizar a página: ' + (e.message || e) })); }
     } else {
-      page.appendChild(U.h('div', { class: 'tne-card p-6', text: 'Página não encontrada.' }));
+      page.appendChild(U.h('div', { class: 'tmg-card p-6', text: 'Página não encontrada.' }));
     }
   }
   App.render = render;
@@ -431,12 +431,12 @@
     }
     try {
       mostrarProgresso(0);
-      var cfgRes = await TNE.api.getConfig().catch(function(){ return null; });
+      var cfgRes = await TMG.api.getConfig().catch(function(){ return null; });
       var config = (cfgRes && cfgRes.config) || {};
 
       mostrarProgresso(1);
-      var rawTasks = (TNE.files && TNE.files.getTasks()) || [];
-      var rawInc   = (TNE.files && TNE.files.getIncidents()) || [];
+      var rawTasks = (TMG.files && TMG.files.getTasks()) || [];
+      var rawInc   = (TMG.files && TMG.files.getIncidents()) || [];
       var prazoMap = D.montarPrazoMap(prazoOverride(config));
 
       mostrarProgresso(2);
@@ -453,7 +453,7 @@
           var _missingIds = ids.filter(function (id) { return !cached[id]; });
           if (_missingIds.length) {
             try {
-              var _lkD = await TNE.api.lookupCities(_missingIds);
+              var _lkD = await TMG.api.lookupCities(_missingIds);
               if (_lkD && _lkD.map && Object.keys(_lkD.map).length) {
                 validMap = Object.assign({}, cached, _lkD.map);
                 _vmapSave(validMap);
@@ -463,7 +463,7 @@
           }
         } else {
           try {
-            var lk = await TNE.api.lookupCities(ids);
+            var lk = await TMG.api.lookupCities(ids);
             validMap = (lk && lk.map) || {};
             _vmapSave(validMap);
           } catch (e) {
@@ -495,21 +495,21 @@
     } finally {
       U.loading(false);
     }
-    if (TNE.config.AUTO_REFRESH_SEG > 0) {
+    if (TMG.config.AUTO_REFRESH_SEG > 0) {
       if (App._timer) clearInterval(App._timer);
-      App._timer = setInterval(function () { App.refresh(true); }, TNE.config.AUTO_REFRESH_SEG * 1000);
+      App._timer = setInterval(function () { App.refresh(true); }, TMG.config.AUTO_REFRESH_SEG * 1000);
     }
   }
 
   function boot() {
     wireLogin();
     window.addEventListener('hashchange', render);
-    if (TNE.auth.isLogged()) startApp();
+    if (TMG.auth.isLogged()) startApp();
     else showLogin();
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
 
-  TNE.app = App;
-})(window.TNE = window.TNE || {});
+  TMG.app = App;
+})(window.TMG = window.TMG || {});

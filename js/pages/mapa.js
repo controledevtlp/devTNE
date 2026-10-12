@@ -1,5 +1,5 @@
 ﻿/* ============================================================
- * Página: Mapa Operacional TNE
+ * Página: Mapa Operacional TMG
  * ============================================================
  * Mapa Leaflet com dados de sites vindos da ponte local
  * (http://localhost:5057/api/mapa) que acessa o PHP interno
@@ -12,15 +12,15 @@
  *  • Marcadores Hub FO
  *  • Busca por site, END_ID ou cidade
  * ============================================================ */
-(function (TNE) {
-  TNE.pages = TNE.pages || {};
-  var U = TNE.ui, C = TNE.constants;
+(function (TMG) {
+  TMG.pages = TMG.pages || {};
+  var U = TMG.ui, C = TMG.constants;
 
-  var LS_COORDS   = 'tne_coordMap';
-  var LS_MW       = 'tne_mwData';
-  var LS_FO       = 'tne_foData';
-  var LS_MARKERS  = 'tne_mapaMarkers';  // sites fora com coordenadas (markerData do Genesis)
-  var PONTE_URL   = 'http://localhost:5057/api/tne';
+  var LS_COORDS   = 'tmg_coordMap';
+  var LS_MW       = 'tmg_mwData';
+  var LS_FO       = 'tmg_foData';
+  var LS_MARKERS  = 'tmg_mapaMarkers';  // sites fora com coordenadas (markerData do Genesis)
+  var PONTE_URL   = 'http://localhost:5057/api/tmg';
 
   // ── Cores exatas do mapa original ───────────────────────────
   var MW_CORES = {
@@ -49,8 +49,8 @@
   function salvarMapaDados(coordMap, mwData, foData, markers) {
     saveLS(LS_COORDS, coordMap);
     // Cache em memória: garante que dashboard.js acesse os dados mesmo se localStorage falhar
-    TNE._mwDataCache = mwData || [];
-    TNE._foDataCache = foData || [];
+    TMG._mwDataCache = mwData || [];
+    TMG._foDataCache = foData || [];
     var mwSave = (mwData||[]).map(function(l){ return { Enlace2:l.Enlace2||'', LAT_A:l.LAT_A, LONG_A:l.LONG_A, LAT_B:l.LAT_B, LONG_B:l.LONG_B, FORNECEDOR:l.FORNECEDOR||'' }; });
     var foSave = (foData||[]).map(function(h){ return { NEName:h.NEName||'', HUB:h.HUB||'', LAT_A:h.LAT_A, LONG_A:h.LONG_A, FORNECEDOR:h.FORNECEDOR||'' }; });
     saveLS(LS_MW, mwSave);
@@ -60,7 +60,7 @@
       saveLS(LS_MARKERS, mSave);
     }
   }
-  TNE.mapaSetDados = salvarMapaDados;
+  TMG.mapaSetDados = salvarMapaDados;
 
   // ── Parsear Genesis Mapa HTML → markerData + mwData + foData + coordMap ──
   // markerData = sites fora com campos: NEName, Latitude, Longitude, ENDID, tempo, queda …
@@ -86,7 +86,7 @@
     var markerData = extractVar('markerData');
     var mwData     = extractVar('mwData');
     var foData     = extractVar('foData');
-    console.log('[Mapa TNE] parseGenesis: markerData=' + markerData.length + ' mwData=' + mwData.length + ' foData=' + foData.length,
+    console.log('[Mapa TMG] parseGenesis: markerData=' + markerData.length + ' mwData=' + mwData.length + ' foData=' + foData.length,
                 markerData.length ? markerData[0] : '(vazio)');
 
     var coordMap = {};
@@ -158,7 +158,7 @@
       htmlLen: htmlText.length,
       snippet: htmlText.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200)
     };
-    console.log('[Mapa TNE] parseGenesis:', debugInfo, markerData.length ? markerData[0] : null);
+    console.log('[Mapa TMG] parseGenesis:', debugInfo, markerData.length ? markerData[0] : null);
 
     salvarMapaDados(coordMap, mwData, foData, markerData);
     return {
@@ -167,17 +167,17 @@
       debugInfo: debugInfo
     };
   }
-  TNE.mapaParseGenesis = parseGenesisParaMapa;
+  TMG.mapaParseGenesis = parseGenesisParaMapa;
 
   // ── PÁGINA ─────────────────────────────────────────────────
-  TNE.pages.mapa = function(container, ctx) {
+  TMG.pages.mapa = function(container, ctx) {
     var data      = ctx.data || {};
     var readOnly  = !!ctx.readOnly;
     var incidents = data.incidentsEnriched || [];
     var tasks     = data.tasksEnriched     || [];
 
     // Dados de mapa: contexto > localStorage > estáticos embutidos > vazio
-    var coordMap = ctx.mapaCoordMap || loadLS(LS_COORDS) || TNE.defaultCoordMap || {};
+    var coordMap = ctx.mapaCoordMap || loadLS(LS_COORDS) || TMG.defaultCoordMap || {};
     var mapaMarkers = loadLS(LS_MARKERS) || [];
 
     // Enriquecer coordMap com coords do snapshot slim (para o dashboard público funcionar com incidentes dinâmicos)
@@ -201,8 +201,8 @@
       if (!Array.isArray(x)) return x;
       return { LAT_A: x[0], LONG_A: x[1], HUB: x[2], NEName: x[3] };
     }
-    var rawMw = ctx.mapaMwData || loadLS(LS_MW) || TNE.defaultMwData || [];
-    var rawFo = ctx.mapaFoData || loadLS(LS_FO) || TNE.defaultFoData || [];
+    var rawMw = ctx.mapaMwData || loadLS(LS_MW) || TMG.defaultMwData || [];
+    var rawFo = ctx.mapaFoData || loadLS(LS_FO) || TMG.defaultFoData || [];
     var mwData = rawMw.map(_normMw);
     var foData = rawFo.map(_normFo);
 
@@ -235,7 +235,7 @@
     var _boundaryCache = {};
 
     // ── Geocodificação TSK (Nominatim) — cache em localStorage ───────────
-    var GEO_CACHE_KEY = 'tne_geo_cache';
+    var GEO_CACHE_KEY = 'tmg_geo_cache';
     var geoCache = (function() { try { return JSON.parse(localStorage.getItem(GEO_CACHE_KEY)||'{}'); } catch(e){ return {}; } })();
     function geocodificarEndereco(logradouro, cidade, bairro, cb) {
       var q = [logradouro, bairro, cidade, 'Brasil'].filter(Boolean).join(', ');
@@ -276,17 +276,17 @@
 
     // ── Barra de controles ─────────────────────────────────────
     var siteInput = U.h('input', {
-      class: 'tne-input',
+      class: 'tmg-input',
       placeholder: 'Site ou END_ID...',
       style: { flex: '1', maxWidth: '190px', fontSize: '13px' }
     });
     var cityInput = U.h('input', {
-      class: 'tne-input',
+      class: 'tmg-input',
       placeholder: 'Buscar cidade...',
       style: { flex: '1', maxWidth: '160px', fontSize: '13px' }
     });
     var searchInput = siteInput; // compatibilidade
-    var _cityDlId = 'tne-city-dl';
+    var _cityDlId = 'tmg-city-dl';
     if (document.getElementById(_cityDlId)) document.getElementById(_cityDlId).remove();
     var _cityDL = document.createElement('datalist');
     _cityDL.id = _cityDlId;
@@ -303,17 +303,17 @@
     var ckMW    = mkCheck('Enlaces MW'); ckMW.chk.checked = true;
     var ckFO    = mkCheck('Hubs FO');
 
-    var statsEl = U.h('div', { style: { fontSize:'12px', color:'var(--tne-muted)', display:'flex', gap:'14px', flexWrap:'wrap', alignItems:'center' } });
+    var statsEl = U.h('div', { style: { fontSize:'12px', color:'var(--tmg-muted)', display:'flex', gap:'14px', flexWrap:'wrap', alignItems:'center' } });
 
     // Botão buscar via ponte
     var btnPonte = U.h('button', {
-      class: 'tne-btn tne-btn-primary clickable',
+      class: 'tmg-btn tmg-btn-primary clickable',
       style: { fontSize:'12px', padding:'4px 14px', display:'inline-flex', alignItems:'center', gap:'6px' }
     }, [U.h('span',{text:'Buscar sites (ponte + VPN)' })]);
 
     // Botão importar HTML (fallback)
     var btnImport = U.h('button', {
-      class: 'tne-btn tne-btn-ghost clickable',
+      class: 'tmg-btn tmg-btn-ghost clickable',
       style: { fontSize:'12px', padding:'4px 12px', display:'inline-flex', alignItems:'center', gap:'6px', opacity:'0.8' }
     }, [U.h('span',{text:'Importar Genesis HTML' })]);
     var fileInput = U.h('input', { type:'file', accept:'.html,.htm', style:{ display:'none' } });
@@ -321,7 +321,7 @@
 
     var ctrlBar = U.h('div', {
       style: { display:'flex', alignItems:'center', gap:'12px', flexWrap:'wrap', marginBottom:'10px',
-               padding:'10px 14px', background:'var(--tne-card)', borderRadius:'10px', border:'1px solid var(--tne-border)',
+               padding:'10px 14px', background:'var(--tmg-card)', borderRadius:'10px', border:'1px solid var(--tmg-border)',
                position:'relative', zIndex:'1' }
     }, [siteInput, cityInput, ckFlag0.el, ckMW.el, ckFO.el]
        .concat(readOnly ? [] : [U.h('div', {style:{marginLeft:'auto',display:'flex',gap:'8px'}}, [btnPonte, btnImport])]));
@@ -340,8 +340,8 @@
         text: '—'
       });
       var chip = U.h('button', {
-        class: 'tne-btn tne-btn-ghost clickable',
-        style: { fontSize:'11px', padding:'4px 12px', borderRadius:'10px', transition:'all .15s', border:'1px solid var(--tne-border)', textAlign:'center', lineHeight:'1.35' }
+        class: 'tmg-btn tmg-btn-ghost clickable',
+        style: { fontSize:'11px', padding:'4px 12px', borderRadius:'10px', transition:'all .15s', border:'1px solid var(--tmg-border)', textAlign:'center', lineHeight:'1.35' }
       }, [
         U.h('span', { style:{ display:'block', fontWeight:'600' }, text: C.REGIAO_LABELS[r] || r }),
         cntEl
@@ -351,11 +351,11 @@
       chip.addEventListener('click', function() {
         if (_filtros.regiao === r) {
           _filtros.regiao = null;
-          chip.style.background=''; chip.style.color=''; chip.style.borderColor='var(--tne-border)'; chip.style.fontWeight='';
+          chip.style.background=''; chip.style.color=''; chip.style.borderColor='var(--tmg-border)'; chip.style.fontWeight='';
         } else {
           _filtros.regiao = r;
-          Object.values(_regiaoChips).forEach(function(c){ c.style.background=''; c.style.color=''; c.style.borderColor='var(--tne-border)'; c.style.fontWeight=''; });
-          chip.style.background='var(--tne-primary)'; chip.style.color='#0a160f'; chip.style.borderColor='var(--tne-primary)'; chip.style.fontWeight='700';
+          Object.values(_regiaoChips).forEach(function(c){ c.style.background=''; c.style.color=''; c.style.borderColor='var(--tmg-border)'; c.style.fontWeight=''; });
+          chip.style.background='var(--tmg-primary)'; chip.style.color='#0a160f'; chip.style.borderColor='var(--tmg-primary)'; chip.style.fontWeight='700';
         }
         applyMarkerFilter();
       });
@@ -388,16 +388,16 @@
       });
     })();
     var btnRelatorio = U.h('button', {
-      class: 'tne-btn tne-btn-ghost clickable',
-      style: { fontSize:'11px', padding:'3px 12px', borderRadius:'999px', border:'1px solid var(--tne-border)', marginLeft:'auto', whiteSpace:'nowrap' },
+      class: 'tmg-btn tmg-btn-ghost clickable',
+      style: { fontSize:'11px', padding:'3px 12px', borderRadius:'999px', border:'1px solid var(--tmg-border)', marginLeft:'auto', whiteSpace:'nowrap' },
       text: '📋 Copiar relatório'
     });
     btnRelatorio.addEventListener('click', gerarRelatorio);
     regionBar.appendChild(btnRelatorio);
 
     var btnXlsx = U.h('button', {
-      class: 'tne-btn tne-btn-ghost clickable',
-      style: { fontSize:'11px', padding:'3px 10px', borderRadius:'999px', border:'1px solid var(--tne-border)', whiteSpace:'nowrap', opacity:'0.75' },
+      class: 'tmg-btn tmg-btn-ghost clickable',
+      style: { fontSize:'11px', padding:'3px 10px', borderRadius:'999px', border:'1px solid var(--tmg-border)', whiteSpace:'nowrap', opacity:'0.75' },
       text: '⬇ coords.xlsx'
     });
     btnXlsx.addEventListener('click', exportarCoordXlsx);
@@ -431,16 +431,16 @@
         var inp = U.h('input', {
           type: 'text', list: dlId,
           placeholder: 'ENDID ou nome do site...',
-          style: { flex:'1', background:'var(--tne-card2)', border:'1px solid var(--tne-border)',
-                   borderRadius:'6px', color:'var(--tne-fg)', padding:'4px 8px', fontSize:'12px',
+          style: { flex:'1', background:'var(--tmg-card2)', border:'1px solid var(--tmg-border)',
+                   borderRadius:'6px', color:'var(--tmg-fg)', padding:'4px 8px', fontSize:'12px',
                    outline:'none' }
         });
         var btnX = U.h('button', {
-          style: { background:'none', border:'none', color:'var(--tne-muted)', cursor:'pointer', fontSize:'15px', lineHeight:'1', padding:'0 4px', flexShrink:'0' },
+          style: { background:'none', border:'none', color:'var(--tmg-muted)', cursor:'pointer', fontSize:'15px', lineHeight:'1', padding:'0 4px', flexShrink:'0' },
           text: '×'
         });
         var badge = U.h('span', {
-          style: { fontSize:'11px', fontWeight:'700', color:'var(--tne-primary)', width:'16px', textAlign:'center', flexShrink:'0' },
+          style: { fontSize:'11px', fontWeight:'700', color:'var(--tmg-primary)', width:'16px', textAlign:'center', flexShrink:'0' },
           text: letras[idx] || String(idx+1)
         });
         var linha = U.h('div', { style: { display:'flex', alignItems:'center', gap:'6px' } },
@@ -464,15 +464,15 @@
       pontosWrap.appendChild(criarLinhaPonto(1));
 
       var btnAdd = U.h('button', {
-        class: 'tne-btn tne-btn-ghost clickable',
+        class: 'tmg-btn tmg-btn-ghost clickable',
         style: { fontSize:'11px', padding:'2px 10px' }, text: '+ Adicionar ponto'
       });
       var btnCalc = U.h('button', {
-        class: 'tne-btn tne-btn-primary clickable',
+        class: 'tmg-btn tmg-btn-primary clickable',
         style: { fontSize:'11px', padding:'2px 12px' }, text: 'Calcular Rota'
       });
       var btnLimpar = U.h('button', {
-        class: 'tne-btn tne-btn-ghost clickable',
+        class: 'tmg-btn tmg-btn-ghost clickable',
         style: { fontSize:'11px', padding:'2px 10px' }, text: 'Limpar'
       });
 
@@ -520,14 +520,14 @@
       var bodyEl = U.h('div', { style:{marginTop:'8px',display:'none'} }, [pontosWrap, acoesEl, resultDiv]);
 
       var toggleBtn = U.h('button', {
-        style:{background:'none',border:'none',color:'var(--tne-muted)',cursor:'pointer',fontSize:'12px',padding:'0'},
+        style:{background:'none',border:'none',color:'var(--tmg-muted)',cursor:'pointer',fontSize:'12px',padding:'0'},
         text: '▸'
       });
 
       var headerEl = U.h('div', {
         style:{display:'flex',alignItems:'center',justifyContent:'space-between',cursor:'pointer'}
       }, [
-        U.h('span',{style:{fontSize:'12px',fontWeight:'600',color:'var(--tne-fg)'},text:'📏 Calcular Rota de Atendimento'}),
+        U.h('span',{style:{fontSize:'12px',fontWeight:'600',color:'var(--tmg-fg)'},text:'📏 Calcular Rota de Atendimento'}),
         toggleBtn
       ]);
       headerEl.addEventListener('click', function() {
@@ -537,7 +537,7 @@
       });
 
       rotaPainelEl = U.h('div', {
-        style:{background:'var(--tne-card)',border:'1px solid var(--tne-border)',borderRadius:'8px',
+        style:{background:'var(--tmg-card)',border:'1px solid var(--tmg-border)',borderRadius:'8px',
                padding:'10px 14px',marginTop:'6px',marginBottom:'2px',position:'relative',zIndex:'1'}
       }, [headerEl, bodyEl]);
       container.appendChild(rotaPainelEl);
@@ -546,9 +546,9 @@
     // ── Container do mapa ──────────────────────────────────────
     // z-index do mapa menor que a sidebar (a sidebar usa z-index 200+)
     var mapDiv = U.h('div', {
-      id: 'tne-mapa-leaflet',
+      id: 'tmg-mapa-leaflet',
       style: { height:'65vh', borderRadius:'12px', overflow:'hidden',
-               border:'1px solid var(--tne-border)', marginTop:'10px',
+               border:'1px solid var(--tmg-border)', marginTop:'10px',
                position:'relative', zIndex:'0' }
     });
     container.appendChild(mapDiv);
@@ -567,7 +567,7 @@
       { cor:'#2ecc71', shape:'square', label:'Hub FO' },
       { cor:'#aaa', shape:'thickline', label:'Linha grossa = enlace de site fora', noClick:true },
     ];
-    var legEl = U.h('div', { style: { display:'flex', gap:'12px', flexWrap:'wrap', marginTop:'8px', fontSize:'11px', color:'var(--tne-muted)' } },
+    var legEl = U.h('div', { style: { display:'flex', gap:'12px', flexWrap:'wrap', marginTop:'8px', fontSize:'11px', color:'var(--tmg-muted)' } },
       legItems.map(function(item) {
         var ico;
         if (item.shape === 'thickline') {
@@ -586,7 +586,7 @@
 
     if (!readOnly) {
       semCoordPanelEl = U.h('div', {
-        style: { marginTop:'8px', background:'var(--tne-card)', border:'1px solid var(--tne-border)',
+        style: { marginTop:'8px', background:'var(--tmg-card)', border:'1px solid var(--tmg-border)',
                  borderRadius:'8px', overflow:'hidden', display:'none' }
       });
       container.appendChild(semCoordPanelEl);
@@ -643,11 +643,11 @@
 
     function initMap() {
       if (mapInstance) return;
-      var initCenter = ctx.prevCenter || [-8.0, -38.0];
-      var initZoom   = (ctx.prevZoom  != null) ? ctx.prevZoom : 6;
-      mapInstance = window.L.map('tne-mapa-leaflet', { preferCanvas: true, zoomControl: true })
+      var initCenter = ctx.prevCenter || [-19.9, -43.9];
+      var initZoom   = (ctx.prevZoom  != null) ? ctx.prevZoom : 7;
+      mapInstance = window.L.map('tmg-mapa-leaflet', { preferCanvas: true, zoomControl: true })
         .setView(initCenter, initZoom);
-      if (readOnly) TNE._publicMapInstance = mapInstance; // permite salvar estado no refresh silencioso
+      if (readOnly) TMG._publicMapInstance = mapInstance; // permite salvar estado no refresh silencioso
 
       window.L.tileLayer('https://server.arcgisonline.com/arcgis/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
         attribution: '&copy; <a href="https://www.esri.com/">Esri</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
@@ -704,7 +704,7 @@
       if (!mapInstance || pts.length < 2) return;
       if (rotaLayer) { rotaLayer.remove(); rotaLayer = null; }
       resultDiv.style.display = 'block';
-      resultDiv.innerHTML = '<span style="color:var(--tne-muted)">⏳ Calculando rota...</span>';
+      resultDiv.innerHTML = '<span style="color:var(--tmg-muted)">⏳ Calculando rota...</span>';
 
       var waypoints = pts.map(function(p){ return p.lon+','+p.lat; }).join(';');
       var url = 'https://router.project-osrm.org/route/v1/driving/'+waypoints+'?overview=full&geometries=geojson&steps=false';
@@ -721,22 +721,22 @@
           mapInstance.fitBounds(rotaLayer.getBounds().pad(0.15), { maxZoom:14 });
 
           var legs = rota.legs || [];
-          var html = '<div style="border-radius:6px;overflow:hidden;border:1px solid var(--tne-border)">';
+          var html = '<div style="border-radius:6px;overflow:hidden;border:1px solid var(--tmg-border)">';
           var totDist=0, totDur=0;
           legs.forEach(function(leg,i){
             var km=(leg.distance/1000).toFixed(1);
             var t=fmtTempo(Math.round(leg.duration));
             totDist+=leg.distance; totDur+=leg.duration;
-            html+='<div style="padding:5px 10px;border-bottom:1px solid var(--tne-border);display:flex;gap:10px;align-items:baseline">'
-              +'<b style="color:var(--tne-primary);white-space:nowrap">'+'ABCDEFGHIJKLMNOP'[i]+' → '+'ABCDEFGHIJKLMNOP'[i+1]+'</b>'
-              +'<span style="color:var(--tne-muted);font-size:11px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'
+            html+='<div style="padding:5px 10px;border-bottom:1px solid var(--tmg-border);display:flex;gap:10px;align-items:baseline">'
+              +'<b style="color:var(--tmg-primary);white-space:nowrap">'+'ABCDEFGHIJKLMNOP'[i]+' → '+'ABCDEFGHIJKLMNOP'[i+1]+'</b>'
+              +'<span style="color:var(--tmg-muted);font-size:11px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'
               +pts[i].nome+' → '+pts[i+1].nome+'</span>'
               +'<span style="color:#2ecc71;white-space:nowrap">🚗 '+km+' km</span>'
               +' <span style="color:#3498db;white-space:nowrap">⏱ '+t+'</span>'
               +'</div>';
           });
           if (legs.length>1) {
-            html+='<div style="padding:5px 10px;background:var(--tne-card2);display:flex;gap:14px;font-weight:700">'
+            html+='<div style="padding:5px 10px;background:var(--tmg-card2);display:flex;gap:14px;font-weight:700">'
               +'<span>Total</span>'
               +'<span style="color:#2ecc71">🚗 '+(totDist/1000).toFixed(1)+' km</span>'
               +'<span style="color:#3498db">⏱ '+fmtTempo(Math.round(totDur))+'</span>'
@@ -747,17 +747,17 @@
         })
         .catch(function(){
           // Fallback: linha reta com Haversine
-          var html='<div style="color:var(--tne-muted);font-size:11px;margin-bottom:4px">OSRM indisponível — distância em linha reta:</div>'
-            +'<div style="border-radius:6px;overflow:hidden;border:1px solid var(--tne-border)">';
+          var html='<div style="color:var(--tmg-muted);font-size:11px;margin-bottom:4px">OSRM indisponível — distância em linha reta:</div>'
+            +'<div style="border-radius:6px;overflow:hidden;border:1px solid var(--tmg-border)">';
           var totKm=0;
           var latlngs = pts.map(function(p){ return [p.lat,p.lon]; });
           for (var i=0;i<pts.length-1;i++){
             var km=haversineKm(pts[i].lat,pts[i].lon,pts[i+1].lat,pts[i+1].lon);
             totKm+=km;
-            html+='<div style="padding:5px 10px;border-bottom:1px solid var(--tne-border);display:flex;gap:10px">'
-              +'<b style="color:var(--tne-primary)">'+'ABCDEFGH'[i]+' → '+'ABCDEFGH'[i+1]+'</b>'
-              +'<span style="color:var(--tne-muted);flex:1">'+pts[i].nome+' → '+pts[i+1].nome+'</span>'
-              +'<span style="color:var(--tne-primary)">~'+km.toFixed(1)+' km (reta)</span>'
+            html+='<div style="padding:5px 10px;border-bottom:1px solid var(--tmg-border);display:flex;gap:10px">'
+              +'<b style="color:var(--tmg-primary)">'+'ABCDEFGH'[i]+' → '+'ABCDEFGH'[i+1]+'</b>'
+              +'<span style="color:var(--tmg-muted);flex:1">'+pts[i].nome+' → '+pts[i+1].nome+'</span>'
+              +'<span style="color:var(--tmg-primary)">~'+km.toFixed(1)+' km (reta)</span>'
               +'</div>';
           }
           if (pts.length>2) html+='<div style="padding:5px 10px;font-weight:700">Total reta: ~'+totKm.toFixed(1)+' km</div>';
@@ -1126,7 +1126,7 @@
                    + '<br><button onclick="(function(){' +
                      'var el=document.getElementById(\'' + popId + '\');' +
                      'var btn=el.querySelector(\'.geo-btn\');btn.textContent=\'Geocodificando...\';btn.disabled=true;' +
-                     'TNE._geocodTSK(\'' + eid + '\',' + lat + ',' + lon + ',\'' + encodeURIComponent(tsk.enderecoLogradouro||'') + '\',\'' + encodeURIComponent(tsk.cidade||'') + '\',\'' + encodeURIComponent(tsk.bairro||'') + '\', el);' +
+                     'TMG._geocodTSK(\'' + eid + '\',' + lat + ',' + lon + ',\'' + encodeURIComponent(tsk.enderecoLogradouro||'') + '\',\'' + encodeURIComponent(tsk.cidade||'') + '\',\'' + encodeURIComponent(tsk.bairro||'') + '\', el);' +
                    '})()" class="geo-btn" style="margin-top:4px;font-size:10px;padding:2px 7px;background:rgba(52,152,219,.15);color:#3498db;border:1px solid #3498db;border-radius:4px;cursor:pointer">📍 Ver endereço no mapa</button>'
                    : '')
               : '<span style="color:#e74c3c">Sem TSK aberta</span>')
@@ -1202,18 +1202,18 @@
     }
 
     function appendCoordSection(container, items, hasCoords) {
-      var NS = 'tne'; // prefixo CSS
+      var NS = 'tmg'; // prefixo CSS
       var expanded = false;
       var label = hasCoords
         ? '📍 ' + items.length + ' site(s) com coordenada'
         : '⚠ ' + items.length + ' site(s) sem coordenada';
-      var color = hasCoords ? 'var(--tne-muted)' : '#e67e22';
+      var color = hasCoords ? 'var(--tmg-muted)' : '#e67e22';
       var sep = container.children.length > 0;
-      var toggleBtn = U.h('span', { style:{ marginLeft:'auto', fontSize:'12px', cursor:'pointer', color:'var(--tne-muted)' }, text: '▸' });
+      var toggleBtn = U.h('span', { style:{ marginLeft:'auto', fontSize:'12px', cursor:'pointer', color:'var(--tmg-muted)' }, text: '▸' });
       var header = U.h('div', {
         style:{ display:'flex', alignItems:'center', gap:'8px', padding:'8px 14px', cursor:'pointer',
                 borderBottom:'1px solid transparent',
-                borderTop: sep ? '1px solid var(--tne-border)' : 'none' }
+                borderTop: sep ? '1px solid var(--tmg-border)' : 'none' }
       }, [
         U.h('span', { style:{ fontSize:'12px', fontWeight:'600', color: color }, text: label }),
         toggleBtn
@@ -1228,16 +1228,16 @@
       colsHdr.forEach(function(h) {
         var th = document.createElement('th');
         th.textContent = h;
-        th.style.cssText = 'text-align:left;padding:5px 10px;color:var(--tne-muted);font-weight:600;position:sticky;top:0;background:var(--tne-card);border-bottom:1px solid var(--tne-border);';
+        th.style.cssText = 'text-align:left;padding:5px 10px;color:var(--tmg-muted);font-weight:600;position:sticky;top:0;background:var(--tmg-card);border-bottom:1px solid var(--tmg-border);';
         hrow.appendChild(th);
       });
       var tbodyEl = tbl.createTBody();
 
       items.forEach(function(item) {
         var tr = tbodyEl.insertRow();
-        tr.style.borderBottom = '1px solid var(--tne-border)';
+        tr.style.borderBottom = '1px solid var(--tmg-border)';
         [item.eid, item.site||'—', item.cidade||'—'].forEach(function(txt) {
-          var td = tr.insertCell(); td.style.padding = '5px 10px'; td.style.color = 'var(--tne-muted)';
+          var td = tr.insertCell(); td.style.padding = '5px 10px'; td.style.color = 'var(--tmg-muted)';
           td.textContent = txt;
         });
         if (hasCoords) {
@@ -1246,12 +1246,12 @@
           var lonVal = (coordParts[1]||'').trim();
           var tdCoord = tr.insertCell(); tdCoord.style.padding = '5px 10px';
           var tdAcao  = tr.insertCell(); tdAcao.style.padding = '4px 8px';
-          var coordDisplay = U.h('span', { style:{ color:'var(--tne-muted)', fontFamily:'monospace', fontSize:'11px' }, text: item.coordStr });
-          var latInp = U.h('input', { type:'text', value: latVal, style:{ width:'90px', background:'var(--tne-card2)', border:'1px solid var(--tne-border)', borderRadius:'4px', color:'var(--tne-fg)', padding:'3px 6px', fontSize:'12px', outline:'none', display:'none' } });
-          var lonInp = U.h('input', { type:'text', value: lonVal, style:{ width:'90px', background:'var(--tne-card2)', border:'1px solid var(--tne-border)', borderRadius:'4px', color:'var(--tne-fg)', padding:'3px 6px', fontSize:'12px', outline:'none', display:'none' } });
-          var editBtn   = U.h('button', { class:'tne-btn tne-btn-ghost clickable', style:{fontSize:'11px',padding:'3px 8px'}, text:'✏ editar' });
-          var saveBtn   = U.h('button', { class:'tne-btn tne-btn-primary clickable', style:{fontSize:'11px',padding:'3px 10px',display:'none'}, text:'💾' });
-          var cancelBtn = U.h('button', { class:'tne-btn tne-btn-ghost clickable', style:{fontSize:'11px',padding:'3px 8px',display:'none',marginLeft:'4px'}, text:'✖' });
+          var coordDisplay = U.h('span', { style:{ color:'var(--tmg-muted)', fontFamily:'monospace', fontSize:'11px' }, text: item.coordStr });
+          var latInp = U.h('input', { type:'text', value: latVal, style:{ width:'90px', background:'var(--tmg-card2)', border:'1px solid var(--tmg-border)', borderRadius:'4px', color:'var(--tmg-fg)', padding:'3px 6px', fontSize:'12px', outline:'none', display:'none' } });
+          var lonInp = U.h('input', { type:'text', value: lonVal, style:{ width:'90px', background:'var(--tmg-card2)', border:'1px solid var(--tmg-border)', borderRadius:'4px', color:'var(--tmg-fg)', padding:'3px 6px', fontSize:'12px', outline:'none', display:'none' } });
+          var editBtn   = U.h('button', { class:'tmg-btn tmg-btn-ghost clickable', style:{fontSize:'11px',padding:'3px 8px'}, text:'✏ editar' });
+          var saveBtn   = U.h('button', { class:'tmg-btn tmg-btn-primary clickable', style:{fontSize:'11px',padding:'3px 10px',display:'none'}, text:'💾' });
+          var cancelBtn = U.h('button', { class:'tmg-btn tmg-btn-ghost clickable', style:{fontSize:'11px',padding:'3px 8px',display:'none',marginLeft:'4px'}, text:'✖' });
           tdCoord.appendChild(coordDisplay); tdCoord.appendChild(latInp); tdCoord.appendChild(lonInp);
           tdAcao.appendChild(editBtn); tdAcao.appendChild(saveBtn); tdAcao.appendChild(cancelBtn);
           editBtn.addEventListener('click', function() {
@@ -1274,11 +1274,11 @@
             });
           });
         } else {
-          var latInp = U.h('input', { type:'text', placeholder:'-19.9173', style:{ width:'95px', background:'var(--tne-card2)', border:'1px solid var(--tne-border)', borderRadius:'4px', color:'var(--tne-fg)', padding:'3px 6px', fontSize:'12px', outline:'none' } });
-          var lonInp = U.h('input', { type:'text', placeholder:'-43.9346', style:{ width:'95px', background:'var(--tne-card2)', border:'1px solid var(--tne-border)', borderRadius:'4px', color:'var(--tne-fg)', padding:'3px 6px', fontSize:'12px', outline:'none' } });
+          var latInp = U.h('input', { type:'text', placeholder:'-19.9173', style:{ width:'95px', background:'var(--tmg-card2)', border:'1px solid var(--tmg-border)', borderRadius:'4px', color:'var(--tmg-fg)', padding:'3px 6px', fontSize:'12px', outline:'none' } });
+          var lonInp = U.h('input', { type:'text', placeholder:'-43.9346', style:{ width:'95px', background:'var(--tmg-card2)', border:'1px solid var(--tmg-border)', borderRadius:'4px', color:'var(--tmg-fg)', padding:'3px 6px', fontSize:'12px', outline:'none' } });
           var tdLat = tr.insertCell(); tdLat.style.padding = '4px 8px'; tdLat.appendChild(latInp);
           var tdLon = tr.insertCell(); tdLon.style.padding = '4px 8px'; tdLon.appendChild(lonInp);
-          var btnSave = U.h('button', { class:'tne-btn tne-btn-primary clickable', style:{fontSize:'11px',padding:'3px 10px'}, text:'💾' });
+          var btnSave = U.h('button', { class:'tmg-btn tmg-btn-primary clickable', style:{fontSize:'11px',padding:'3px 10px'}, text:'💾' });
           btnSave.addEventListener('click', function() {
             salvarCoordManual(item.eid, latInp.value, lonInp.value, function() {
               tr.style.opacity='0.4'; btnSave.disabled=true; btnSave.textContent='✓';
@@ -1292,7 +1292,7 @@
         expanded = !expanded;
         tbody.style.display = expanded ? '' : 'none';
         toggleBtn.textContent = expanded ? '▾' : '▸';
-        header.style.borderBottomColor = expanded ? 'var(--tne-border)' : 'transparent';
+        header.style.borderBottomColor = expanded ? 'var(--tmg-border)' : 'transparent';
       });
       container.appendChild(header);
       container.appendChild(tbody);
@@ -1305,8 +1305,8 @@
       coordMap[eid] = [lat, lon];
       saveLS(LS_COORDS, coordMap);
       var coordStr = lat.toFixed(6) + ', ' + lon.toFixed(6);
-      if (TNE.api && TNE.api.saveMapaCoords) TNE.api.saveMapaCoords(coordMap).catch(function(){});
-      if (TNE.api && TNE.api.saveCoordVALID_CAD) TNE.api.saveCoordVALID_CAD([{ endId: eid, coord: coordStr }]).catch(function(){});
+      if (TMG.api && TMG.api.saveMapaCoords) TMG.api.saveMapaCoords(coordMap).catch(function(){});
+      if (TMG.api && TMG.api.saveCoordVALID_CAD) TMG.api.saveCoordVALID_CAD([{ endId: eid, coord: coordStr }]).catch(function(){});
       if (mapaMarkers.length) renderSites(mapaMarkers);
       else renderComCoordMap();
       renderEstaticos();
@@ -1463,7 +1463,7 @@
                    + '<br><button onclick="(function(){' +
                      'var el=document.getElementById(\'' + popId2 + '\');' +
                      'var btn=el.querySelector(\'.geo-btn\');btn.textContent=\'Geocodificando...\';btn.disabled=true;' +
-                     'TNE._geocodTSK(\'' + eid + '\',' + coords[0] + ',' + coords[1] + ',\'' + encodeURIComponent(tsk.enderecoLogradouro||'') + '\',\'' + encodeURIComponent(tsk.cidade||'') + '\',\'' + encodeURIComponent(tsk.bairro||'') + '\', el);' +
+                     'TMG._geocodTSK(\'' + eid + '\',' + coords[0] + ',' + coords[1] + ',\'' + encodeURIComponent(tsk.enderecoLogradouro||'') + '\',\'' + encodeURIComponent(tsk.cidade||'') + '\',\'' + encodeURIComponent(tsk.bairro||'') + '\', el);' +
                    '})()" class="geo-btn" style="margin-top:4px;font-size:10px;padding:2px 7px;background:rgba(52,152,219,.15);color:#3498db;border:1px solid #3498db;border-radius:4px;cursor:pointer">📍 Ver endereço no mapa</button>'
                    : '')
               : '<span style="color:#e74c3c">Sem TSK aberta</span>')
@@ -1496,8 +1496,8 @@
       statsEl.innerHTML = '';
       [
         { text:'Sites fora: ' + total, cor:'#e74c3c' },
-        { text:'Sem coord: ' + semCoord, cor:'var(--tne-muted)' },
-        { text:'MW: ' + mwData.length, cor:'var(--tne-muted)' },
+        { text:'Sem coord: ' + semCoord, cor:'var(--tmg-muted)' },
+        { text:'MW: ' + mwData.length, cor:'var(--tmg-muted)' },
         { text:'FO: ' + foData.length, cor:'#2ecc71' },
       ].forEach(function(item) {
         statsEl.appendChild(U.h('span', { style:{ fontSize:'12px', color:item.cor } }, item.text));
@@ -1541,7 +1541,7 @@
           });
         })
         .catch(function(e) {
-          U.toast('Ponte não disponível. Use "Importar Genesis HTML" ou inicie o ponte_tne.py.', 'err');
+          U.toast('Ponte não disponível. Use "Importar Genesis HTML" ou inicie o ponte_tmg.py.', 'err');
         })
         .finally(function() { btnPonte.textContent = 'Buscar sites (ponte + VPN)'; btnPonte.disabled = false; });
     }
@@ -1558,8 +1558,8 @@
         fileInput.value = '';
         if (result.coordCount > 0) {
           U.toast('Genesis: ' + result.siteCount + ' sites / ' + result.coordCount + ' coords importadas.', 'ok');
-          if (TNE.api && TNE.api.saveMapaCoords) {
-            TNE.api.saveMapaCoords(result.coordMap).catch(function() {});
+          if (TMG.api && TMG.api.saveMapaCoords) {
+            TMG.api.saveMapaCoords(result.coordMap).catch(function() {});
           }
         } else {
           var di = result.debugInfo || {};
@@ -1582,7 +1582,7 @@
     });
 
     // ── Handler global de geocodificação para callbacks nos popups ───────
-    TNE._geocodTSK = function(eid, latGenesis, lonGenesis, endEnc, cidEnc, bairroEnc, el) {
+    TMG._geocodTSK = function(eid, latGenesis, lonGenesis, endEnc, cidEnc, bairroEnc, el) {
       var log = decodeURIComponent(endEnc), cid = decodeURIComponent(cidEnc), bai = decodeURIComponent(bairroEnc);
       geocodificarEndereco(log, cid, bai, function(err, res) {
         var btn = el && el.querySelector('.geo-btn');
@@ -1636,4 +1636,4 @@
     });
   };
 
-})(window.TNE = window.TNE || {});
+})(window.TMG = window.TMG || {});

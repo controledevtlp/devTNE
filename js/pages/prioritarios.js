@@ -1,4 +1,4 @@
-﻿/* =====================================================================
+/* =====================================================================
  * Página: Prioritários
  * =====================================================================
  * Botões-categoria com drilldown.
@@ -10,10 +10,10 @@
  *  • Backbone usa "LONGA DISTANCIA" (sem "BACKBONE")
  *  • B2B: DJ contém "PREMIUM" OU BG contém "B2B-TIM"/"tracking_corporativo"/"PREMIUM"
  * ===================================================================== */
-(function (TNE) {
-  TNE.pages = TNE.pages || {};
-  var U = TNE.ui, C = TNE.constants;
-  var LS_CONC = 'tne_concentradores';
+(function (TMG) {
+  TMG.pages = TMG.pages || {};
+  var U = TMG.ui, C = TMG.constants;
+  var LS_CONC = 'tmg_concentradores';
 
   // Cache em memória — inicializado com localStorage para render imediato.
   // Sincronizado com o backend na abertura da página (assíncrono).
@@ -62,8 +62,8 @@
   function carregarConc() { return _concCache; }
   function salvarConc(l, onSalvo) {
     _concCache = l || [];
-    if (TNE.api && TNE.api.saveConcentradores) {
-      TNE.api.saveConcentradores(_concCache)
+    if (TMG.api && TMG.api.saveConcentradores) {
+      TMG.api.saveConcentradores(_concCache)
         .then(function (res) {
           if (res && res.offline) {
             U.toast('Salvo localmente (sem backend configurado).', 'ok');
@@ -100,7 +100,7 @@
       return U.h('span', {
         style: { display:'inline-flex', alignItems:'center', justifyContent:'center', width:'28px' },
         title: 'Sem atualização'
-      }, [U.h('span', { class: 'tne-pulse-dot' })]);
+      }, [U.h('span', { class: 'tmg-pulse-dot' })]);
     }
     var resultado = U.classificarUltimoBloco(bg);
     var estado = resultado.estado;
@@ -111,7 +111,7 @@
       var conteudo = dois.length > 1
         ? '── Último ──\n\n' + dois[0] + '\n\n── Penúltimo ──\n\n' + dois[1]
         : (dois[0] || bg || '—');
-      var el = U.h('div', { style: { whiteSpace:'pre-wrap', fontFamily:'ui-monospace,monospace', fontSize:'12px', maxHeight:'60vh', overflowY:'auto', padding:'12px', lineHeight:'1.6', background:'var(--tne-card2)', borderRadius:'8px' }, text: conteudo });
+      var el = U.h('div', { style: { whiteSpace:'pre-wrap', fontFamily:'ui-monospace,monospace', fontSize:'12px', maxHeight:'60vh', overflowY:'auto', padding:'12px', lineHeight:'1.6', background:'var(--tmg-card2)', borderRadius:'8px' }, text: conteudo });
       U.openModal('Último Update — ' + (t.osNumero || ''), el);
     }
 
@@ -122,11 +122,11 @@
       return U.h('span', {
         style: { display:'inline-flex', alignItems:'center', justifyContent:'center', width:'28px' },
         title: 'Sem atualização do técnico'
-      }, [U.h('span', { class: 'tne-pulse-dot' })]);
+      }, [U.h('span', { class: 'tmg-pulse-dot' })]);
     }
     if (estado === 'acionamento') {
       return U.h('button', {
-        class: 'tne-btn', style: { background:'transparent', border:'none', padding:'2px 4px', cursor:'pointer', display:'inline-flex', alignItems:'center', color:'var(--tne-primary)' },
+        class: 'tmg-btn', style: { background:'transparent', border:'none', padding:'2px 4px', cursor:'pointer', display:'inline-flex', alignItems:'center', color:'var(--tmg-primary)' },
         title: preview || 'Verificando acionamento', onclick: abrirModal
       }, [U.h('span', { html: ICONE_FOLHA_PRIO })]);
     }
@@ -138,7 +138,7 @@
         dtLabel = ehOntem ? 'ontem' : (resultado.dt.getDate()+'/'+(resultado.dt.getMonth()+1));
       }
       return U.h('button', {
-        class: 'tne-btn', style: { background:'transparent', border:'none', padding:'2px 4px', cursor:'pointer', display:'inline-flex', alignItems:'center', gap:'3px', color:'var(--tne-muted)' },
+        class: 'tmg-btn', style: { background:'transparent', border:'none', padding:'2px 4px', cursor:'pointer', display:'inline-flex', alignItems:'center', gap:'3px', color:'var(--tmg-muted)' },
         title: preview + (dtLabel?' ('+dtLabel+')':''), onclick: abrirModal
       }, [
         U.h('span', { html: ICONE_FOLHA_PRIO }),
@@ -147,7 +147,7 @@
     }
     // ok — folha verde
     return U.h('button', {
-      class: 'tne-btn', style: { background:'transparent', border:'none', padding:'2px 4px', cursor:'pointer', display:'inline-flex', alignItems:'center', color:'var(--tne-green)' },
+      class: 'tmg-btn', style: { background:'transparent', border:'none', padding:'2px 4px', cursor:'pointer', display:'inline-flex', alignItems:'center', color:'var(--tmg-green)' },
       title: preview, onclick: abrirModal
     }, [U.h('span', { html: ICONE_FOLHA_PRIO })]);
   }
@@ -157,7 +157,7 @@
     var u = up(s), cor = '#9aa5b1', bg = 'rgba(154,165,177,.15)', lbl = s || '—';
     if (u === 'INICIADO')                                   { cor = '#1fae5e'; bg = 'rgba(46,204,113,.2)'; }
     else if (u === 'NÃO INICIADO' || u === 'NAO INICIADO') { cor = '#f0b429'; bg = 'rgba(240,180,41,.25)'; lbl = 'NÃO INIC.'; }
-    return U.h('span', { class: 'tne-badge', style: { background: bg, color: cor, fontWeight: '700', fontSize: '10px' }, text: lbl });
+    return U.h('span', { class: 'tmg-badge', style: { background: bg, color: cor, fontWeight: '700', fontSize: '10px' }, text: lbl });
   }
 
   // ── copiar texto para clipboard ──────────────────────────────────────
@@ -254,7 +254,7 @@
   function tabelaTarefas(rows, opts) {
     opts = opts || {};
     if (!rows.length) {
-      return U.h('p', { style: { color: 'var(--tne-muted)', fontSize: '13px', fontStyle: 'italic', textAlign: 'center', padding: '24px 0' }, text: opts.vazio || 'Nenhum resultado.' });
+      return U.h('p', { style: { color: 'var(--tmg-muted)', fontSize: '13px', fontStyle: 'italic', textAlign: 'center', padding: '24px 0' }, text: opts.vazio || 'Nenhum resultado.' });
     }
     var thead = U.h('thead', null, U.h('tr', null,
       ['Status', 'TSK', 'NE / Site', 'END_ID', 'Falha', 'Fila Atual', 'ÚLTIMO UPDATE']
@@ -262,7 +262,7 @@
     var tbody = U.h('tbody', null, rows.map(function (t) {
       return U.h('tr', null, [
         U.h('td', null, statusBadge(t.status)),
-        U.h('td', null, U.h('span', { style: { fontFamily: 'ui-monospace,monospace', fontWeight: '700', fontSize: '12px', color: 'var(--tne-primary)' }, text: t.osNumero || '—' })),
+        U.h('td', null, U.h('span', { style: { fontFamily: 'ui-monospace,monospace', fontWeight: '700', fontSize: '12px', color: 'var(--tmg-primary)' }, text: t.osNumero || '—' })),
         U.h('td', { text: t.siteId || t.enderecoId || '—', style: { maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }),
         U.h('td', { text: t.enderecoId || '—', style: { fontFamily: 'ui-monospace,monospace', fontSize: '11px' } }),
         U.h('td', { text: t.tipoFalha || '—', style: { maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }),
@@ -270,13 +270,13 @@
         U.h('td', null, bgCell(t))
       ]);
     }));
-    return U.h('div', { style: { overflowX: 'auto' } }, U.h('table', { class: 'tne-table' }, [thead, tbody]));
+    return U.h('div', { style: { overflowX: 'auto' } }, U.h('table', { class: 'tmg-table' }, [thead, tbody]));
   }
 
   // ── tabela de concentradores ──────────────────────────────────────────
   function tabelaConcentradores(matches) {
     if (!matches.length) {
-      return U.h('p', { style: { color: 'var(--tne-muted)', fontSize: '13px', fontStyle: 'italic', textAlign: 'center', padding: '24px 0' }, text: 'Nenhum concentrador com alerta ativo no momento.' });
+      return U.h('p', { style: { color: 'var(--tmg-muted)', fontSize: '13px', fontStyle: 'italic', textAlign: 'center', padding: '24px 0' }, text: 'Nenhum concentrador com alerta ativo no momento.' });
     }
     var tarefas = matches.filter(function (m) { return m.tipo === 'task'; });
     var incids  = matches.filter(function (m) { return m.tipo === 'incident'; });
@@ -289,7 +289,7 @@
         var t = m.data;
         return U.h('tr', { style: { borderLeft: '3px solid #9b59b6' } }, [
           U.h('td', null, statusBadge(t.status)),
-          U.h('td', null, U.h('span', { style: { fontFamily: 'ui-monospace,monospace', fontWeight: '700', fontSize: '12px', color: 'var(--tne-primary)' }, text: t.osNumero || '—' })),
+          U.h('td', null, U.h('span', { style: { fontFamily: 'ui-monospace,monospace', fontWeight: '700', fontSize: '12px', color: 'var(--tmg-primary)' }, text: t.osNumero || '—' })),
           U.h('td', { text: t.siteId || t.enderecoId || '—' }),
           U.h('td', { text: t.enderecoId || '—', style: { fontFamily: 'ui-monospace,monospace', fontSize: '11px' } }),
           U.h('td', { text: t.tipoFalha || '—' }),
@@ -300,7 +300,7 @@
       }));
       sections.push(U.h('div', { style: { marginBottom: '16px' } }, [
         U.h('p', { style: { fontSize: '12px', fontWeight: '700', color: '#9b59b6', marginBottom: '6px' }, text: '📋 Tarefas abertas (' + tarefas.length + ')' }),
-        U.h('div', { style: { overflowX: 'auto' } }, U.h('table', { class: 'tne-table' }, [thead, tbody]))
+        U.h('div', { style: { overflowX: 'auto' } }, U.h('table', { class: 'tmg-table' }, [thead, tbody]))
       ]));
     }
     if (incids.length) {
@@ -321,7 +321,7 @@
       }));
       sections.push(U.h('div', null, [
         U.h('p', { style: { fontSize: '12px', fontWeight: '700', color: '#e74c3c', marginBottom: '6px' }, text: '🚨 Sites Fora (Incidentes) (' + incids.length + ')' }),
-        U.h('div', { style: { overflowX: 'auto' } }, U.h('table', { class: 'tne-table' }, [thead2, tbody2]))
+        U.h('div', { style: { overflowX: 'auto' } }, U.h('table', { class: 'tmg-table' }, [thead2, tbody2]))
       ]));
     }
     return U.h('div', null, sections);
@@ -329,11 +329,11 @@
 
   // ── formulário de cadastro ────────────────────────────────────────────
   function formConcentradores(onSalvar) {
-    var inpSite = U.h('input', { class: 'tne-input', placeholder: 'Site (ex.: RJBT40)', style: { flex: '1', minWidth: '120px' } });
-    var inpEnd  = U.h('input', { class: 'tne-input', placeholder: 'END_ID (ex.: RJRJO_0143)', style: { flex: '1', minWidth: '140px' } });
-    var inpNota = U.h('input', { class: 'tne-input', placeholder: 'Anotação (ex.: Hub principal)', style: { flex: '2', minWidth: '200px' } });
+    var inpSite = U.h('input', { class: 'tmg-input', placeholder: 'Site (ex.: RJBT40)', style: { flex: '1', minWidth: '120px' } });
+    var inpEnd  = U.h('input', { class: 'tmg-input', placeholder: 'END_ID (ex.: RJRJO_0143)', style: { flex: '1', minWidth: '140px' } });
+    var inpNota = U.h('input', { class: 'tmg-input', placeholder: 'Anotação (ex.: Hub principal)', style: { flex: '2', minWidth: '200px' } });
     var btnAdd  = U.h('button', {
-      class: 'tne-btn tne-btn-primary clickable', html: '+ Cadastrar',
+      class: 'tmg-btn tmg-btn-primary clickable', html: '+ Cadastrar',
       onclick: function () {
         var s = (inpSite.value || '').trim(), e = (inpEnd.value || '').trim(), n = (inpNota.value || '').trim();
         if (!s && !e) { U.toast('Informe ao menos o Site ou END_ID.', 'err'); return; }
@@ -343,19 +343,19 @@
         salvarConc(lista, onSalvar);
       }
     });
-    return U.h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', padding: '12px', background: 'var(--tne-card2)', borderRadius: '8px', marginBottom: '12px' } },
+    return U.h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', padding: '12px', background: 'var(--tmg-card2)', borderRadius: '8px', marginBottom: '12px' } },
       [inpSite, inpEnd, inpNota, btnAdd]);
   }
 
   function listaConcentradores(lista, onRemover) {
-    if (!lista.length) return U.h('p', { style: { color: 'var(--tne-muted)', fontSize: '12px', fontStyle: 'italic' }, text: 'Nenhum concentrador cadastrado. Use o formulário acima.' });
+    if (!lista.length) return U.h('p', { style: { color: 'var(--tmg-muted)', fontSize: '12px', fontStyle: 'italic' }, text: 'Nenhum concentrador cadastrado. Use o formulário acima.' });
     return U.h('div', { style: { marginBottom: '12px' } }, lista.map(function (c) {
-      return U.h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0', borderBottom: '1px solid var(--tne-border)', fontSize: '12px', flexWrap: 'wrap' } }, [
+      return U.h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0', borderBottom: '1px solid var(--tmg-border)', fontSize: '12px', flexWrap: 'wrap' } }, [
         U.h('span', { style: { fontFamily: 'ui-monospace,monospace', fontWeight: '700', minWidth: '80px' }, text: c.site || '—' }),
-        U.h('span', { style: { color: 'var(--tne-muted)', minWidth: '120px' }, text: c.endId || '—' }),
-        U.h('span', { style: { color: 'var(--tne-muted)', fontStyle: 'italic', flex: '1' }, text: c.nota || '' }),
+        U.h('span', { style: { color: 'var(--tmg-muted)', minWidth: '120px' }, text: c.endId || '—' }),
+        U.h('span', { style: { color: 'var(--tmg-muted)', fontStyle: 'italic', flex: '1' }, text: c.nota || '' }),
         U.h('button', {
-          class: 'tne-btn tne-btn-ghost clickable',
+          class: 'tmg-btn tmg-btn-ghost clickable',
           style: { fontSize: '10px', padding: '1px 6px', color: '#e74c3c', marginLeft: 'auto' },
           text: '✕ Remover',
           onclick: function () { salvarConc(carregarConc().filter(function (x) { return x.id !== c.id; }), onRemover); }
@@ -367,11 +367,11 @@
   // ── botão categoria ───────────────────────────────────────────────────
   function btnCategoria(opts) {
     return U.h('button', {
-      class: 'tne-btn clickable',
+      class: 'tmg-btn clickable',
       style: {
         display: 'flex', alignItems: 'center', gap: '10px',
         padding: '14px 22px', borderRadius: '12px', fontSize: '14px', fontWeight: '700',
-        background: opts.ativo ? opts.cor : 'var(--tne-card2)',
+        background: opts.ativo ? opts.cor : 'var(--tmg-card2)',
         color: opts.ativo ? '#fff' : opts.cor,
         border: '2px solid ' + opts.cor,
         boxShadow: opts.ativo ? ('0 4px 18px ' + opts.cor + '55') : 'none',
@@ -393,7 +393,7 @@
   }
 
   // ── PÁGINA PRINCIPAL ─────────────────────────────────────────────────
-  TNE.pages.prioritarios = function (container, ctx) {
+  TMG.pages.prioritarios = function (container, ctx) {
     var app  = ctx.app;
     var data = ctx.data || {};
 
@@ -432,8 +432,8 @@
     var catAtiva = { v: null };
 
     // Sincroniza com o backend ao abrir — atualiza cache, contagem e drilldown se necessário
-    if (TNE.api && TNE.api.getConcentradores) {
-      TNE.api.getConcentradores().then(function (res) {
+    if (TMG.api && TMG.api.getConcentradores) {
+      TMG.api.getConcentradores().then(function (res) {
         if (!res || !res.lista) return;
         if (JSON.stringify(res.lista) !== JSON.stringify(_concCache)) {
           _concCache = res.lista;
@@ -469,7 +469,7 @@
     container.appendChild(drillArea);
 
     function renderDrill(cat) {
-      var card = U.h('div', { class: 'tne-card p-5', style: { animation: 'fadeIn .18s ease' } });
+      var card = U.h('div', { class: 'tmg-card p-5', style: { animation: 'fadeIn .18s ease' } });
 
       // ── Cabeçalho com título + botão(ões) copiar ──
       // copias: [{ label, fn }] para múltiplos botões; se omitido usa onCopiar com label 'Copiar'
@@ -478,7 +478,7 @@
         var botoesWrap = U.h('div', { style: { display: 'flex', gap: '4px', marginLeft: 'auto', flexWrap: 'wrap' } },
           opcoes.map(function (op) {
             return U.h('button', {
-              class: 'tne-btn tne-btn-ghost clickable',
+              class: 'tmg-btn tmg-btn-ghost clickable',
               style: { fontSize: '11px', padding: '2px 9px', display: 'inline-flex', alignItems: 'center', gap: '5px', border: '1px solid rgba(255,255,255,.15)' },
               onclick: function () { copyText(op.fn()); }
             }, [U.h('span', { text: '📋' }), U.h('span', { text: op.label })]);
@@ -508,7 +508,7 @@
         card.appendChild(formConcentradores(function () { concMatches = calcMatches(); setCategoria('conc'); }));
         card.appendChild(listaConcentradores(carregarConc(), function () { concMatches = calcMatches(); setCategoria('conc'); }));
         if (concMatches.length > 0) {
-          card.appendChild(U.h('hr', { style: { margin: '12px 0', borderColor: 'var(--tne-border)' } }));
+          card.appendChild(U.h('hr', { style: { margin: '12px 0', borderColor: 'var(--tmg-border)' } }));
           card.appendChild(U.h('p', { style: { fontWeight: '700', fontSize: '13px', marginBottom: '8px', color: '#9b59b6' }, text: 'Alertas ativos:' }));
           card.appendChild(tabelaConcentradores(concMatches));
         }
@@ -518,10 +518,10 @@
 
     container.appendChild(U.h('div', { style: { marginTop: '16px', display: 'flex', justifyContent: 'flex-end' } }, [
       U.h('button', {
-        class: 'tne-btn tne-btn-ghost clickable', text: '🔄 Atualizar painel',
+        class: 'tmg-btn tmg-btn-ghost clickable', text: '🔄 Atualizar painel',
         onclick: function () { app.refresh(true).then(function () { app.render(); }); }
       })
     ]));
   };
 
-})(window.TNE = window.TNE || {});
+})(window.TMG = window.TMG || {});

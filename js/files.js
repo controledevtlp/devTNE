@@ -1,12 +1,12 @@
-﻿/* =====================================================================
- * files.js  —  LEITURA DE ARQUIVOS "Atividades-tne_FMMT" (Excel)
+/* =====================================================================
+ * files.js  —  LEITURA DE ARQUIVOS "Atividades-TMG_FMMT" (Excel)
  * ---------------------------------------------------------------------
  * As TAREFAS (tickets) e os INCIDENTES NÃO ficam mais na planilha Google.
  * Eles são lidos diretamente aqui no navegador, a partir dos arquivos que
  * caem na sua pasta de Downloads:
  *
- *   • Atividades-tne_FMMT_<DATA>        -> tarefas agendadas
- *   • Atividades-tne_FMMT_Não-agendada  -> tarefas não agendadas
+ *   • Atividades-TMG_FMMT_<DATA>        -> tarefas agendadas
+ *   • Atividades-TMG_FMMT_Não-agendada  -> tarefas não agendadas
  *
  * Há dois caminhos:
  *   1) "Conectar pasta" (Chrome/Edge): usa a File System Access API.
@@ -18,7 +18,7 @@
  * Os dados ficam guardados no próprio navegador (localStorage), então
  * sobrevivem a um F5. Use a página "Importar dados" para gerenciar.
  * ===================================================================== */
-(function (TNE) {
+(function (TMG) {
   var F = {};
   var monitor = { timer: null, onUpdate: null, interval: 45000, lastSignature: null, busy: false };
 
@@ -144,7 +144,7 @@
   function isCsvName(name)   { return /\.csv$/i.test(name || ''); }
   function isAtividadesFile(name) {
     var n = norm(name);
-    return (isExcelName(name) || isCsvName(name)) && n.indexOf('atividades-tne_fmmt') >= 0;
+    return (isExcelName(name) || isCsvName(name)) && n.indexOf('atividades-tmg_fmmt') >= 0;
   }
   function isNaoAgendada(name) {
     var n = norm(name);
@@ -165,11 +165,11 @@
   // ------------------------------------------------------------------
   // 4) Persistência (localStorage) + memória
   // ------------------------------------------------------------------
-  var LS_TASKS = 'tne_rawTasks', LS_INC = 'tne_rawInc', LS_META = 'tne_filesMeta';
-  var LS_TASKS_AG = 'tne_rawTasksAg';   // agendada (por data)
-  var LS_TASKS_NA = 'tne_rawTasksNa';   // não-agendada
-  var LS_META_AG  = 'tne_metaAg';       // metadados do slot agendada
-  var LS_META_NA  = 'tne_metaNa';       // metadados do slot não-agendada
+  var LS_TASKS = 'tmg_rawTasks', LS_INC = 'tmg_rawInc', LS_META = 'tmg_filesMeta';
+  var LS_TASKS_AG = 'tmg_rawTasksAg';   // agendada (por data)
+  var LS_TASKS_NA = 'tmg_rawTasksNa';   // não-agendada
+  var LS_META_AG  = 'tmg_metaAg';       // metadados do slot agendada
+  var LS_META_NA  = 'tmg_metaNa';       // metadados do slot não-agendada
   var mem = { tasks: [], tasksAg: [], tasksNa: [], inc: [], meta: {}, metaAg: null, metaNa: null };
   (function loadLS() {
     try { mem.tasks = JSON.parse(localStorage.getItem(LS_TASKS) || '[]') || []; } catch (e) { mem.tasks = []; }
@@ -245,7 +245,7 @@
   // ------------------------------------------------------------------
   // 5) IndexedDB — guarda o "handle" da pasta de Downloads
   // ------------------------------------------------------------------
-  var IDB_NAME = 'tne-files', IDB_STORE = 'handles', IDB_KEY = 'downloadsDir';
+  var IDB_NAME = 'tmg-files', IDB_STORE = 'handles', IDB_KEY = 'downloadsDir';
   function idbOpen() {
     return new Promise(function (resolve, reject) {
       if (!window.indexedDB) { reject(new Error('IndexedDB indisponível.')); return; }
@@ -300,7 +300,7 @@
     }
     // 2ª passada: lê os poucos arquivos que importam, em paralelo (bem mais rápido
     // que um `await` por arquivo dentro do loop, principalmente com vários
-    // "Atividades-tne_FMMT_<data>" acumulados).
+    // "Atividades-TMG_FMMT_<data>" acumulados).
     var files = await Promise.all(entries.map(function (e) { return e.getFile(); }));
     return entries.map(function (entry, i) {
       var file = files[i];
@@ -321,7 +321,7 @@
     // 'readwrite' (não só 'read'): depois de cada leitura, os arquivos lidos
     // (agendada + não-agendada) são movidos para a subpasta "Importados",
     // pra não embolar com os próximos downloads que caírem na pasta.
-    var handle = await window.showDirectoryPicker({ id: 'tne-downloads', mode: 'readwrite', startIn: 'downloads' });
+    var handle = await window.showDirectoryPicker({ id: 'tmg-downloads', mode: 'readwrite', startIn: 'downloads' });
     await idbSet(IDB_KEY, handle);
     return handle.name;
   };
@@ -430,7 +430,7 @@
       // os arquivos já foram movidos pra "Importados" numa verificação
       // anterior — não é erro, só não tem nada novo desde então.
       if (mem.tasks.length) return { total: mem.tasks.length, arquivos: (mem.meta && mem.meta.tasks && mem.meta.tasks.arquivos) || [], unchanged: true };
-      throw new Error('Nenhum arquivo "Atividades-tne_FMMT" foi encontrado na pasta conectada (confira se já não foram movidos para a subpasta "Importados").');
+      throw new Error('Nenhum arquivo "Atividades-TMG_FMMT" foi encontrado na pasta conectada (confira se já não foram movidos para a subpasta "Importados").');
     }
     var sig = buildSignature(matches);
     if (sig && sig === monitor.lastSignature) {
@@ -483,7 +483,7 @@
   F.readManualFiles = async function (fileList, onProgress) {
     var files = Array.prototype.slice.call(fileList || []);
     var xls = files.filter(function (f) { return isExcelName(f.name) || isCsvName(f.name); });
-    if (!xls.length) throw new Error('Selecione um ou mais arquivos .xlsx ou .csv (Atividades-tne_FMMT).');
+    if (!xls.length) throw new Error('Selecione um ou mais arquivos .xlsx ou .csv (Atividades-TMG_FMMT).');
     var matches = xls.map(function (f) {
       return { name: f.name, file: f, naoAgendada: isNaoAgendada(f.name), key: dateKey(f.name, f.lastModified) };
     });
@@ -532,5 +532,5 @@
     return { total: parsed.length, amostra: parsed.slice(0, 5) };
   };
 
-  TNE.files = F;
-})(window.TNE = window.TNE || {});
+  TMG.files = F;
+})(window.TMG = window.TMG || {});
