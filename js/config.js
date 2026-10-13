@@ -14,7 +14,7 @@
 (function (TNE) {
   TNE.config = {
     // >>>>>>>>>>>>>>  COLE A URL DO SEU APPS SCRIPT AQUI (termina em /exec)  <<<<<<<<<<<<<<
-    APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbwSPcNv-9o5xNf__chQquuhIGJyn2ff4BNYb8iPCnS2rOq2GClb3sfRrY2_j9JX8mgoOA/exec",
+    APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbx38MV4e1EUP3nhN7INE4BXGBZpRyx0OCMyhP91JAjDf-lUW4Uk18lzNaKg2grNf46WWw/exec",
 
     // Referência da planilha (apenas documentação — não é usada pelo sistema)
     SPREADSHEET_URL: "https://docs.google.com/spreadsheets/d/1BANEy-_Us1FunUFlHYv7mmbdo331qqGB3jvsUAtPPww/edit",
