@@ -574,8 +574,8 @@ body { min-height: 100vh; display: flex; flex-direction: column; }
         }, [U.h('span', {text:'📊'}), U.h('span', {text:'Excel'})])
       ])
     ]));
-    // ── Chips de região com contagens (N · ✓N · ○N) ─────────────────────────
-    (function () {
+    // ── Chips de região (só na visão geral — região específica usa só "← Regiões") ──
+    if (state.regiao === 'TODAS') (function () {
       var incAll = (raw.incidentsEnriched || []).filter(function (i) {
         return (i.statusTrat || 'ATIVO').toUpperCase() !== 'RESOLVIDO';
       });
