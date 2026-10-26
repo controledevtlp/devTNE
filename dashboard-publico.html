@@ -35,6 +35,9 @@
 <script src="js/pages/pesquisa.js"></script>
 <script src="js/pages/produtividade.js"></script>
 <script src="js/pages/atualizacoes.js"></script>
+<script src="js/tip-tsk.js"></script>
+<script src="js/data/topologia-tne.js"></script>
+<script src="js/causa-comum.js"></script>
 <script src="js/retorno.js"></script>
 <script src="js/pages/controle-retorno-page.js"></script>
 <script src="js/data/mapa-enlaces.js"></script>
@@ -257,8 +260,9 @@ body { min-height: 100vh; display: flex; flex-direction: column; }
           openDrillTasks: function(spec, filtros, title, opts, onCopy) {
             var Comp = TNE.compute;
             var rows = Comp.drillTasks(raw.tasksEnriched, spec, filtros||{});
+            if (opts && opts.modoGmg) instalarTipPublico();
             U.openModal(title||'Detalhamento', U.taskTable(rows, opts||{}), {
-              onCopy: onCopy || function(){ return U.taskTableCopyText(rows, title); }
+              onCopy: onCopy || function(){ return U.taskTableCopyText(rows, title, opts); }
             });
           }
         }
@@ -605,9 +609,9 @@ body { min-height: 100vh; display: flex; flex-direction: column; }
     var grupoSelect = (function () {
       var seg = U.h('div', { style: { display: 'inline-flex', border: '1px solid rgba(255,255,255,.2)', borderRadius: '8px', overflow: 'hidden' }, title: 'Filtra as TSKs pela regra criadora (coluna DJ). Os sites fora não têm regra criadora e não mudam.' });
       [['TODAS', 'Todas'], ['FIXA', 'FIXA'], ['MOVEL', 'MÓVEL']].forEach(function (g) {
-        var on = state.grupo === g[0], cor = g[0] === 'FIXA' ? '#1f6fb5' : (g[0] === 'MOVEL' ? '#168a47' : 'var(--trj-primary)');
+        var on = state.grupo === g[0], cor = g[0] === 'FIXA' ? '#1f6fb5' : (g[0] === 'MOVEL' ? '#168a47' : 'var(--tne-primary)');
         seg.appendChild(U.h('button', {
-          style: { padding: '3px 10px', fontSize: '10px', fontWeight: '800', cursor: 'pointer', border: 'none', background: on ? cor : 'transparent', color: on ? '#fff' : 'var(--trj-muted)' },
+          style: { padding: '3px 10px', fontSize: '10px', fontWeight: '800', cursor: 'pointer', border: 'none', background: on ? cor : 'transparent', color: on ? '#fff' : 'var(--tne-muted)' },
           text: g[1], onclick: function () { state.grupo = g[0]; root.innerHTML = ''; renderDashboard(); }
         }));
       });
@@ -954,6 +958,7 @@ body { min-height: 100vh; display: flex; flex-direction: column; }
     { id: 'produtividade', label: 'Produtividade' },
     { id: 'atualizacoes',  label: 'Atualizações' },
     { id: 'retorno',       label: 'Controle de Retorno' },
+    { id: 'causa',         label: 'Causa Comum' },
     { id: 'sitesfora',     label: 'Sites Fora' },
     { id: 'sla',           label: 'SLA' }
   ];
@@ -961,6 +966,7 @@ body { min-height: 100vh; display: flex; flex-direction: column; }
   function buildTabBar(activeId) {
     var bar = U.h('div', { class: 'pub-tabs-bar' });
     PUB_TABS.forEach(function (tab) {
+      if (tab.id === 'causa' && !(TNE.causaComum && TNE.causaComum.disponivel())) return;      // só onde há diagrama de topologia carregado
       var btn = U.h('button', {
         class: 'pub-tab' + (activeId === tab.id ? ' active' : ''),
         text: tab.label,
@@ -1044,6 +1050,14 @@ body { min-height: 100vh; display: flex; flex-direction: column; }
       TNE.pages.atualizacoes(tabContent, ctx);
     } else if (tabId === 'sitesfora' && TNE.pages && TNE.pages.sitesFora) {
       TNE.pages.sitesFora(tabContent, ctx);
+    } else if (tabId === 'causa' && TNE.causaComum && TNE.causaComum.disponivel()) {
+      // Causa comum (pontos comuns de falha pela topologia): mesmo cálculo e mesma tela da aba do link do operador; respeita a região escolhida
+      var resCausa = TNE.causaComum.analisar(TNE.causaComum.gruposSites(rawFiltrado));
+      var caixaCausa = U.h('div', { class: 'cc-box' }); tabContent.appendChild(caixaCausa);
+      TNE.causaComum.render(caixaCausa, resCausa, {
+        COR: { red: '#c62839', amber: '#d68910', green: '#168a47', blue: '#1f6fb5', purple: '#7d3c98', gray: '#6b7280', orange: '#b85a00' },
+        copiar: function (txt, msg) { U.copyText(txt, msg); }
+      });
     } else if (tabId === 'retorno' && TNE.pages && TNE.pages.controleRetorno) {
       var regFixa = state.regiao && state.regiao !== 'TODAS';
       var evR = raw.retornoCompacto && TNE.retorno ? TNE.retorno.expandir(raw.retornoCompacto) : null;
@@ -1056,17 +1070,30 @@ body { min-height: 100vh; display: flex; flex-direction: column; }
     } else if (tabId === 'sla' && TNE.pages && TNE.pages.sla) {
       TNE.pages.sla(tabContent, { data: rawFiltrado, app: appCtx });
     } else {
-      tabContent.appendChild(U.h('div', { class: 'trj-card p-8 text-center' }, [
+      tabContent.appendChild(U.h('div', { class: 'tne-card p-8 text-center' }, [
         U.h('div', { style: { color: 'var(--tne-muted)', fontSize: '14px' }, text: 'Módulo não disponível nesta versão.' })
       ]));
     }
   }
 
   // ── Drills ──────────────────────────────────────────────────────────────────
+  // balão de detalhes da TSK (o mesmo do link do operador) — usado no drill do GMG na fila
+  function instalarTipPublico() {
+    if (!TNE.tipTsk) return;
+    var porTsk = {};
+    (raw.tasksEnriched || []).forEach(function (t) { var k = String(t.osNumero || '').toUpperCase(); if (k) (porTsk[k] = porTsk[k] || []).push(t); });
+    Object.keys(porTsk).forEach(function (k) { porTsk[k].sort(function (a, b) { return (Number(b.sequenciaId) || 0) - (Number(a.sequenciaId) || 0); }); });
+    TNE.tipTsk.instalar({
+      rows: function (os) { return porTsk[String(os).toUpperCase()] || []; },
+      copiar: function (t, m) { U.copyText(t, m); },
+      coord: { get: function (end) { var cm = raw._mapaCoordMap || {}, e = String(end || '').trim().toLowerCase(), v = null; Object.keys(cm).some(function (k) { if (k.toLowerCase() === e) { v = cm[k]; return true; } return false; }); return v && v.length >= 2 && isFinite(+v[0]) && isFinite(+v[1]) ? [+v[0], +v[1]] : null; } }
+    });
+  }
   function openDrillTasks(spec, filtros, title, opts, onCopy) {
     var rows = Comp.drillTasks(raw.tasksEnriched, spec, filtros || {});
+    if (opts && opts.modoGmg) instalarTipPublico();
     U.openModal(title || 'Detalhamento', U.taskTable(rows, opts || {}), {
-      onCopy: onCopy || function () { return U.taskTableCopyText(rows, title); }
+      onCopy: onCopy || function () { return U.taskTableCopyText(rows, title, opts); }
     });
   }
   function openDrillIncidents(spec, title, opts) {

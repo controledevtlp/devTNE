@@ -1,4 +1,4 @@
-﻿/* =====================================================================
+/* =====================================================================
  * produtividade.js — Aba de Produtividade Operacional
  * Encerramentos por dia (dentro/fora SLA, CCI vs Campo) + Reincidentes
  * Histórico persistido em localStorage + pasta "Produtividade" da conexão
@@ -153,12 +153,13 @@
 
     var reinciByDay = {};
 
-    // Tipo 1: compara fimCalc do encerramento anterior com createdAt da nova TSK.
-    // Regra: nova TSK aberta em ≤72h do último encerramento = reincidência.
+    // Tipo 1: mesmo END_ID encerrado duas vezes com gap ≤ 7 dias
     Object.keys(endClosures).forEach(function (eid) {
       var list = endClosures[eid].slice().sort(function (a, b) {
         return a.dia < b.dia ? -1 : 1;
       });
+      // Tipo 1: compara fimCalc do encerramento anterior com createdAt da nova TSK.
+      // Regra: nova TSK aberta em ≤72h do último encerramento = reincidência.
       for (var i = 1; i < list.length; i++) {
         var prevCloseTs  = toTs(list[i - 1].task.fimCalc);
         var nextCreateTs = toTs(list[i].task.createdAt);
@@ -172,7 +173,7 @@
       }
     });
 
-    // Tipo 2: TSK aberta no backlog atual cujo createdAt é ≤72h após o último fimCalc do mesmo END_ID.
+    // Tipo 2: END_ID encerrado em dia anterior com nova TSK ABERTA hoje (reincidente ativo)
     var hoje = toIsoDay(new Date());
     var eidsAbertos = {};
     uniqueTasks.forEach(function (t) {
@@ -182,6 +183,7 @@
       eidsAbertos[eid].push(t);
     });
 
+    // Tipo 2: TSK aberta no backlog atual cujo createdAt é ≤72h após o último fimCalc do mesmo END_ID.
     Object.keys(eidsAbertos).forEach(function (eid) {
       if (!endClosures[eid]) return;
       var lastClosure = endClosures[eid].reduce(function (best, c) {
@@ -266,15 +268,20 @@
     var hoje = toIsoDay(new Date());
     var backlogTotal = 0, backlogVencendo = 0;
     var encHoje = 0, dentroHoje = 0, foraHoje = 0, cciHoje = 0, campoHoje = 0;
-    var tasksHoje = [];
+    var tasksHoje = [], backlogTasks = [], vencendoTasks = [];
     var now = Date.now();
 
     uniqueTasks.forEach(function (t) {
-      if (isBacklog(t)) {
+      // Backlog: mesma lógica do dashboard — apenas corretivas com dataCriacaoAS
+      if (isBacklog(t) && D.isTicketCorretiva(t.tipoAtividade) && !!t.dataCriacaoAS) {
         backlogTotal++;
+        backlogTasks.push(t);
         if (t.vencimentoCalc) {
           var ms = new Date(t.vencimentoCalc).getTime() - now;
-          if (ms > 0 && ms <= 390 * 60000) backlogVencendo++;
+          if (ms > 0 && ms <= 390 * 60000) {
+            backlogVencendo++;
+            vencendoTasks.push(t);
+          }
         }
       }
       if (isConcluida(t) && toIsoDay(t.fimCalc) === hoje) {
@@ -290,8 +297,8 @@
       total: encHoje, dentro: dentroHoje, fora: foraHoje,
       cci: cciHoje, campo: campoHoje, reinci: 0,
       backlog: backlogTotal, backlogVencendo: backlogVencendo,
-      tasks: tasksHoje, reinciItems: [],
-      tipo: 'HOJE'
+      tasks: tasksHoje, backlogTasks: backlogTasks, vencendoTasks: vencendoTasks,
+      reinciItems: [], tipo: 'HOJE'
     };
   }
 
@@ -355,6 +362,7 @@
   // ── Gráfico stacked: encerramentos por dia ─────────────────────────
   function chartEnc(canvas, diasData, onClickDia) {
     var _lineActive = false;
+    // overlay semi-transparente para efeito de foco na linha SLA
     var _overlayEl = null;
     var _wrap = canvas.parentElement;
     if (_wrap) {
@@ -443,7 +451,19 @@
         },
         plugins: {
           legend: { display: true, labels: { color: tickClr(), font: { size: 11 }, boxWidth: 12, padding: 10,
-            filter: function (item) { return item.text !== 'Tendência'; } // ocultar da legenda, mantém no chart
+            filter: function (item) { return item.text !== 'Tendência'; }
+          },
+          onClick: function (e, legendItem, legend) {
+            var ci = legend.chart;
+            var idx = legendItem.datasetIndex;
+            var shown = [0, 1, 2]; // indices visíveis na legenda (Tendência = 3 não aparece)
+            var isolated = shown.every(function (i) { return i === idx ? ci.isDatasetVisible(i) : !ci.isDatasetVisible(i); });
+            if (isolated) {
+              shown.forEach(function (i) { ci.setDatasetVisibility(i, true); });
+            } else {
+              shown.forEach(function (i) { ci.setDatasetVisibility(i, i === idx); });
+            }
+            ci.update();
           } },
           tooltip: Object.assign({}, TOOLTIP_STYLE, {
             callbacks: {
@@ -467,12 +487,15 @@
           })
         },
         onHover: function (ev, els) {
+          var lineEl = els && els.find(function (el) { return el.datasetIndex === 2; });
           ev.native.target.style.cursor = (els && els.length) ? 'pointer' : 'default';
+          if (lineEl) ev.native.target.style.cursor = 'pointer';
         },
         onClick: function (ev, els) {
           if (!els || !els.length) return;
           var lineEl = els.find(function (el) { return el.datasetIndex === 2; });
           if (lineEl) {
+            // Linha % SLA clicada: toggle destaque
             _lineActive = !_lineActive;
             c.data.datasets[0].backgroundColor = _lineActive ? 'rgba(46,204,113,0.2)' : '#2ecc71';
             c.data.datasets[1].backgroundColor = _lineActive ? 'rgba(231,76,60,0.2)'  : '#e74c3c';
@@ -885,15 +908,33 @@
     var labels = [];
     for (var hr = 0; hr < 24; hr++) labels.push(('0' + hr).slice(-2) + 'h');
 
+    // Compute per-hour totals for peak highlighting
+    var hourTotals = new Array(24).fill(0);
+    PRIOS.forEach(function (p) {
+      if (data.byHourPrio[p]) data.byHourPrio[p].forEach(function (v, i) { hourTotals[i] += (v || 0); });
+    });
+    var maxHourTotal = Math.max.apply(null, hourTotals.concat([0]));
+    var peakHrIdx = maxHourTotal > 0 ? hourTotals.indexOf(maxHourTotal) : -1;
+
     var datasets = PRIOS
       .filter(function (p) {
         return data.byHourPrio[p] && data.byHourPrio[p].some(function (v) { return v > 0; });
       })
       .map(function (p) {
+        var baseCor = CORES[p] || '#9aa5b1';
+        var bgColors = (data.byHourPrio[p] || new Array(24).fill(0)).map(function (_, i) {
+          return i === peakHrIdx ? baseCor : baseCor.replace(/^(#[0-9a-f]{3,6})$/i, function (m) {
+            return m; // keep hex, apply alpha via wrapper
+          });
+        });
+        // Use rgba: peak = full, others dim
+        var bgArr = (data.byHourPrio[p] || new Array(24).fill(0)).map(function (v, i) {
+          return i === peakHrIdx ? baseCor : baseCor + '33'; // 33 ≈ 20% opacity hex suffix for 6-char hex
+        });
         return {
           label: p,
           data: data.byHourPrio[p] || new Array(24).fill(0),
-          backgroundColor: CORES[p] || '#9aa5b1',
+          backgroundColor: bgArr,
           borderColor: 'transparent',
           borderRadius: 3,
           maxBarThickness: 32
@@ -1006,7 +1047,7 @@
         ]));
       }
 
-      var preview = entry.content ? (entry.content.length > 300 ? entry.content.substring(0, 300) + '…' : entry.content) : '';
+      var preview = entry.content.length > 300 ? entry.content.substring(0, 300) + '…' : entry.content;
       preview = preview.replace(/<[^>]+>/g, '').replace(/\[code\][\s\S]*?\[\/code\]/g, '[...]').trim();
 
       wrap.appendChild(h('div', { style: { display: 'flex', gap: '10px', alignItems: 'flex-start' } }, [
@@ -1033,6 +1074,7 @@
     var content = h('div', { style: { maxHeight: '70vh', overflowY: 'auto' } });
     content.appendChild(U.taskTable(tasks, { modoResultado: true }));
 
+    // Se houver diário registrado para alguma das OSs do dia, exibir lista de timelines
     var statsComDiario = !_diarioData ? [] : tasks.reduce(function (acc, t) {
       var stat = _diarioData.stats.find(function (s) { return s.task.osNumero && s.task.osNumero === t.osNumero; });
       if (stat && stat.entries && stat.entries.length) acc.push(stat);
@@ -1339,6 +1381,7 @@
       ccPerda.card.style.minHeight = '300px';
       areaEl.appendChild(ccPerda.card);
 
+      // Análise textual de perdas por bloco de horário (só quando filtrado por uma prioridade)
       if (_state.prioridade !== 'TODAS' && perdaData.total > 0) {
         var BLOCOS = [
           { label: 'Madrugada (00–05h)', hrs: [0,1,2,3,4,5] },
@@ -1350,8 +1393,14 @@
           return { label: b.label, count: b.hrs.reduce(function (s, hr) { return s + (hrTotais[hr] || 0); }, 0) };
         });
         blocoTotals.sort(function (a, b) { return b.count - a.count; });
-        var hrPico = '', hrPicoCount = 0;
+        var textoLinhas = blocoTotals.map(function (b) {
+          var pct = (b.count / perdaData.total * 100).toFixed(0);
+          return b.label + ': ' + pct + '% (' + b.count + ' perda' + (b.count !== 1 ? 's' : '') + ')';
+        });
+        var hrPico = '';
+        var hrPicoCount = 0;
         hrTotais.forEach(function (c, hr) { if (c > hrPicoCount) { hrPicoCount = c; hrPico = hr + 'h'; } });
+
         var textCard = h('div', { class: 'tne-card p-4 mb-4', style: { borderLeft: '3px solid #e67e22' } }, [
           h('div', { style: { fontWeight: '700', fontSize: '12px', color: '#e67e22', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' },
             text: 'Análise de perdas — ' + _state.prioridade }),
@@ -1547,15 +1596,15 @@
       h('div', { style: { fontSize: '2.5rem', marginBottom: '12px' }, text: '📂' }),
       h('div', { class: 'font-bold text-base mb-2', text: 'Sem histórico de produtividade' }),
       h('div', { style: { color: 'var(--tne-muted)', fontSize: '13px', maxWidth: '480px', margin: '0 auto 20px' },
-        text: 'Para gerar os gráficos históricos, coloque os arquivos "Atividades-tne_FMMT" anteriores ' +
+        text: 'Para gerar os gráficos históricos, coloque os arquivos "Atividades-TNE_FMMT" anteriores ' +
               'na subpasta "Produtividade" dentro da pasta conectada e clique em processar.' }),
       h('div', { class: 'tne-card p-3 mb-5 text-left', style: { maxWidth: '420px', margin: '0 auto 20px', fontSize: '12px', color: 'var(--tne-muted)' } }, [
         h('div', { class: 'font-bold mb-2', style: { color: 'var(--tne-fg)' }, text: '📁 Estrutura esperada:' }),
         h('div', { text: 'Pasta conectada/' }),
-        h('div', { style: { paddingLeft: '16px' }, text: '├ Atividades-tne_FMMT_hoje.xlsx' }),
+        h('div', { style: { paddingLeft: '16px' }, text: '├ Atividades-TNE_FMMT_hoje.xlsx' }),
         h('div', { style: { paddingLeft: '16px' }, text: '└ Produtividade/' }),
-        h('div', { style: { paddingLeft: '32px' }, text: '├ Atividades-tne_FMMT_2026-07-01.xlsx' }),
-        h('div', { style: { paddingLeft: '32px' }, text: '├ Atividades-tne_FMMT_2026-07-02.xlsx' }),
+        h('div', { style: { paddingLeft: '32px' }, text: '├ Atividades-TNE_FMMT_2026-07-01.xlsx' }),
+        h('div', { style: { paddingLeft: '32px' }, text: '├ Atividades-TNE_FMMT_2026-07-02.xlsx' }),
         h('div', { style: { paddingLeft: '32px' }, text: '└ ...' })
       ]),
       h('button', {
@@ -1568,15 +1617,16 @@
     return panel;
   }
 
-  // ── Modal: limpar histórico com deleção no banco de dados ──────────
+  // ── Modal: processamento de histórico ──────────────────────────────
   function abrirModalLimpar(hist, ctx, onDone) {
+    // Agrupar datas por mês (YYYY-MM) e contar dias por mês
     var mesesMap = {};
     Object.keys(hist).forEach(function (d) {
       var ym = d.substring(0, 7);
       if (!mesesMap[ym]) mesesMap[ym] = 0;
       mesesMap[ym]++;
     });
-    var meses = Object.keys(mesesMap).sort().reverse();
+    var meses = Object.keys(mesesMap).sort().reverse(); // mais recente primeiro
 
     var MESES_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
     function fmtMes(ym) {
@@ -1630,6 +1680,7 @@
         if (TNE.api && TNE.api.deleteProdutividadeHist) {
           var res = await TNE.api.deleteProdutividadeHist(params);
           if (!res || !res.ok) throw new Error(res && res.error ? res.error : 'Erro desconhecido');
+          // Remover do localStorage apenas as datas apagadas
           if (params.all) {
             clearHist();
           } else {
@@ -1644,11 +1695,12 @@
           statusEl.style.color = '#2ecc71';
           statusEl.textContent = '✅ ' + (res.deleted || 0) + ' registro(s) apagado(s) do banco de dados.';
           setTimeout(function () {
-            var ov = document.querySelector('.trj-modal-overlay');
+            var ov = document.querySelector('.tne-modal-overlay');
             if (ov) ov.click();
             if (onDone) onDone();
           }, 1200);
         } else {
+          // Sem API disponível: apagar só local
           if (params.all) { clearHist(); } else {
             var histAtual2 = loadHist();
             mesesApagados.forEach(function (ym) {
@@ -1661,7 +1713,7 @@
           statusEl.style.color = '#f0b429';
           statusEl.textContent = '⚠ Apagado localmente (API indisponível). Os dados permanecem no banco.';
           setTimeout(function () {
-            var ov = document.querySelector('.trj-modal-overlay');
+            var ov = document.querySelector('.tne-modal-overlay');
             if (ov) ov.click();
             if (onDone) onDone();
           }, 1500);
@@ -1695,7 +1747,6 @@
     U.openModal('Limpar Histórico de Produtividade', content);
   }
 
-  // ── Modal: processamento de histórico ──────────────────────────────
   function abrirModalProcessar(ctx, onDone) {
     var progressEl = h('div', { style: { color: 'var(--tne-muted)', fontSize: '13px', minHeight: '24px' }, text: 'Aguardando...' });
     var btnStart = h('button', {

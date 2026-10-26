@@ -1,4 +1,4 @@
-﻿/* =====================================================================
+/* =====================================================================
  * atualizacoes.js — Análise do Diário de Trabalho (coluna BG)
  * ===================================================================== */
 (function (TNE) {
@@ -85,6 +85,7 @@
       var p2 = m[1].trim().match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})(?::(\d{2}))?$/);
       if (!p2) continue;
       // Descarta entradas cujo conteúdo imediato é formulário de sistema
+      // (flag GMG por usuário humano, tramitação, retorno por alarme, etc.)
       var _posA = m.index + m[0].length;
       var _reProxA = new RegExp(RE_TS_A.source);
       var _mProxA = _reProxA.exec(texto.substring(_posA));
@@ -167,6 +168,7 @@
     var retornosPerSite = {};
     var siteCount = {};
 
+    // Contagem por site — todas as tasks (com e sem diário)
     (tasks || []).forEach(function (t) {
       var sk = (t.enderecoId || '').toString().trim().toUpperCase();
       if (!sk) return;
@@ -181,6 +183,7 @@
       if (!entries.length) { semDiario++; return; }
 
       totalEntradas += entries.length;
+      // Primeira entrada do diário ≈ horário de entrada da task na fila
       hourCountEntrantes[entries[0].dt.getHours()]++;
       entries.forEach(function (e) {
         hourCount[e.dt.getHours()]++;
@@ -188,6 +191,7 @@
         authorCount[a] = (authorCount[a] || 0) + 1;
       });
 
+      // Retornos por alarme (API Netcool)
       var retDts = extrairRetornosAlarmeDts(t.motivoCancelamento || '');
       retDts.forEach(function (dt) {
         hourCountRetorno[dt.getHours()]++;
@@ -288,20 +292,24 @@
     };
   }
 
-  // ── Utilitário: copiar texto ──────────────────────────────────────
+  // ── Utilitário: copiar texto (mesma lógica do dashboard) ─────────
   function copyText(txt) {
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(txt).then(function () { U.toast('✓ Copiado!', 'ok'); }).catch(function () { _fbCopy(txt); });
+      navigator.clipboard.writeText(txt)
+        .then(function () { U.toast('✓ Copiado!', 'ok'); })
+        .catch(function () { _fbCopy(txt); });
     } else { _fbCopy(txt); }
     function _fbCopy(s) {
       var ta = document.createElement('textarea');
       ta.value = s; ta.style.position = 'fixed'; ta.style.opacity = '0';
       document.body.appendChild(ta); ta.select();
-      try { document.execCommand('copy'); U.toast('✓ Copiado!', 'ok'); } catch (e) { U.toast('Não foi possível copiar.', 'err'); }
+      try { document.execCommand('copy'); U.toast('✓ Copiado!', 'ok'); }
+      catch (e) { U.toast('Não foi possível copiar.', 'err'); }
       document.body.removeChild(ta);
     }
   }
 
+  // ── Helper: badge de status ───────────────────────────────────────
   function statusBadge(statusStr) {
     var stUp = (statusStr || '').trim().toUpperCase();
     var cor, bg;
@@ -343,72 +351,12 @@
         onClick: function (ev, els) {
           if (!els || !els.length || !stats) return;
           var hrIdx = els[0].index;
-          var tasksHr = stats.filter(function (st) { return st.entries.some(function (e) { return e.dt.getHours() === hrIdx; }); });
+          var hrLabel = labels[hrIdx];
+          var tasksHr = stats.filter(function (st) {
+            return st.entries.some(function (e) { return e.dt.getHours() === hrIdx; });
+          });
           if (!tasksHr.length) return;
-          abrirDrilldownHora(labels[hrIdx] + ' — Entrantes / Retornos', tasksHr);
-        }
-      }
-    });
-    _charts.push(c); return c;
-  }
-
-  // ── Gráfico: distribuição de intervalos + média por OS ────────────
-  function chartHistograma(canvas, allGaps, stats) {
-    var buckets = [
-      { label: '< 30min',  min: 0,   max: 0.5,      cor: '#2ecc71' },
-      { label: '30–60min', min: 0.5, max: 1,         cor: '#27ae60' },
-      { label: '1–2h',     min: 1,   max: 2,         cor: '#3498db' },
-      { label: '2–4h',     min: 2,   max: 4,         cor: '#f39c12' },
-      { label: '4–8h',     min: 4,   max: 8,         cor: '#e67e22' },
-      { label: '8–24h',    min: 8,   max: 24,        cor: '#e74c3c' },
-      { label: '> 24h',    min: 24,  max: Infinity,  cor: '#c0392b' }
-    ];
-
-    var gapCounts = buckets.map(function () { return 0; });
-    allGaps.forEach(function (g) {
-      for (var i = 0; i < buckets.length; i++) {
-        if (g >= buckets[i].min && g < buckets[i].max) { gapCounts[i]++; break; }
-      }
-    });
-
-    var avgCounts = buckets.map(function () { return 0; });
-    (stats || []).forEach(function (s) {
-      if (s.avgGapH === null) return;
-      for (var i = 0; i < buckets.length; i++) {
-        if (s.avgGapH >= buckets[i].min && s.avgGapH < buckets[i].max) { avgCounts[i]++; break; }
-      }
-    });
-
-    var c = new Chart(canvas, {
-      type: 'bar',
-      data: {
-        labels: buckets.map(function (b) { return b.label; }),
-        datasets: [
-          {
-            label: 'Intervalos individuais',
-            data: gapCounts,
-            backgroundColor: buckets.map(function (b) { return b.cor; }),
-            borderRadius: 4, maxBarThickness: 32
-          },
-          {
-            label: 'Média por OS',
-            data: avgCounts,
-            backgroundColor: 'rgba(52,152,219,0.45)',
-            borderColor: 'rgba(52,152,219,0.8)',
-            borderWidth: 1,
-            borderRadius: 4, maxBarThickness: 32
-          }
-        ]
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        scales: {
-          x: { ticks: { color: tickClr(), font: { size: 10 } }, grid: { color: gridClr() } },
-          y: { ticks: { color: tickClr(), font: { size: 11 } }, grid: { color: gridClr() }, beginAtZero: true }
-        },
-        plugins: {
-          legend: { display: true, labels: { color: tickClr(), font: { size: 10 }, boxWidth: 10, padding: 10 } },
-          tooltip: TOOLTIP_STYLE
+          abrirDrilldownHora(hrLabel + ' — Entrantes / Retornos', tasksHr);
         }
       }
     });
@@ -423,6 +371,7 @@
     }
     var total = osEntries.reduce(function (s, x) { return s + x.count; }, 0);
     var wrap = h('div', { style: { maxHeight: '65vh', overflowY: 'auto' } });
+
     var topRow = h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px 10px', borderBottom: '1px solid rgba(255,255,255,0.07)', gap: '8px' } });
     topRow.appendChild(h('span', { style: { fontSize: '12px', color: 'var(--tne-muted)' }, text: total + ' atualização(ões) em ' + osEntries.length + ' OS' + (osEntries.length !== 1 ? 's' : '') }));
     var cpBtn = h('button', { class: 'tne-btn tne-btn-ghost', style: { fontSize: '10px', padding: '2px 8px' }, text: '📋 Copiar' });
@@ -436,9 +385,12 @@
     };
     topRow.appendChild(cpBtn);
     wrap.appendChild(topRow);
+
+    // Cabeçalho de colunas
     wrap.appendChild(h('div', { style: { display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 1fr 0.6fr 1fr auto', gap: '4px', padding: '5px 12px', borderBottom: '1px solid rgba(255,255,255,0.07)', fontSize: '10px', color: 'var(--tne-muted)', fontWeight: '600', textTransform: 'uppercase' } }, [
       h('span', { text: 'TSK' }), h('span', { text: 'Site' }), h('span', { text: 'END ID' }), h('span', { text: 'Falha' }), h('span', { text: 'Qtd.' }), h('span', { text: 'Última Atualiz.' }), h('span', { text: '' })
     ]));
+
     osEntries.forEach(function (entry) {
       var st = entry.stat;
       var item = h('div', {
@@ -454,13 +406,20 @@
         h('span', { style: { color: 'var(--tne-muted)', fontSize: '11px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }, text: String(st.task.enderecoId || '—') }),
         h('span', { style: { color: 'var(--tne-muted)', fontSize: '11px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }, text: st.task.tipoFalha || '—' }),
         h('span', { style: { fontSize: '11px', color: 'var(--tne-fg)', fontWeight: '600', textAlign: 'center' }, text: entry.count + 'x' }),
-        h('span', { style: { color: 'var(--tne-muted)', fontSize: '11px' }, text: entry.lastDt ? fmtDDMM(entry.lastDt) + ' ' + fmtHM(entry.lastDt) : '—' }),
-        h('button', { class: 'tne-btn tne-btn-ghost', style: { fontSize: '10px', padding: '2px 8px', flexShrink: '0' }, text: 'Timeline', onclick: function (e) { e.stopPropagation(); abrirTimeline(st); } })
+        h('span', { style: { color: 'var(--tne-muted)', fontSize: '11px' },
+          text: entry.lastDt ? fmtDDMM(entry.lastDt) + ' ' + fmtHM(entry.lastDt) : '—' }),
+        h('button', {
+          class: 'tne-btn tne-btn-ghost',
+          style: { fontSize: '10px', padding: '2px 8px', flexShrink: '0' },
+          text: 'Timeline',
+          onclick: function (e) { e.stopPropagation(); abrirTimeline(st); }
+        })
       ]);
       item.addEventListener('mouseenter', function () { item.style.background = 'rgba(255,140,0,0.06)'; });
       item.addEventListener('mouseleave', function () { item.style.background = ''; });
       wrap.appendChild(item);
     });
+
     U.openModal(authorName + ' — OSs atualizadas (' + osEntries.length + ')', wrap);
   }
 
@@ -535,13 +494,17 @@
     var copyBtn = h('button', { class: 'tne-btn tne-btn-ghost', style: { fontSize: '10px', padding: '2px 8px', marginBottom: '8px' }, text: '📋 Copiar' });
     copyBtn.onclick = function () {
       var lines = ['TSK\tSITE\tEND ID\tSTATUS\tÚltima atualiz.'];
-      tasksHr.forEach(function (st) { lines.push([st.task.osNumero || '—', st.task.siteId || '—', st.task.enderecoId || '—', st.task.status || '—', fmtDDMM(st.lastDt) + ' ' + fmtHM(st.lastDt)].join('\t')); });
+      tasksHr.forEach(function (st) {
+        lines.push([st.task.osNumero || '—', st.task.siteId || '—', st.task.enderecoId || '—', st.task.status || '—', fmtDDMM(st.lastDt) + ' ' + fmtHM(st.lastDt)].join('\t'));
+      });
       copyText(lines.join('\n'));
     };
     wrap.appendChild(copyBtn);
-    wrap.appendChild(h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr auto', gap: '4px', padding: '6px 12px', borderBottom: '1px solid rgba(255,255,255,0.1)', fontSize: '10px', color: 'var(--tne-muted)', fontWeight: '600', textTransform: 'uppercase' } }, [
+    // Cabeçalho
+    var hdr = h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr auto', gap: '4px', padding: '6px 12px', borderBottom: '1px solid rgba(255,255,255,0.1)', fontSize: '10px', color: 'var(--tne-muted)', fontWeight: '600', textTransform: 'uppercase' } }, [
       h('span', { text: 'TSK' }), h('span', { text: 'Site' }), h('span', { text: 'END ID' }), h('span', { text: 'Status' }), h('span', { text: 'Última Atualiz.' }), h('span', { text: '' })
-    ]));
+    ]);
+    wrap.appendChild(hdr);
     tasksHr.forEach(function (st) {
       var row = h('div', {
         style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr auto', gap: '4px', padding: '8px 12px', borderBottom: '1px solid rgba(255,255,255,0.05)', cursor: 'pointer', alignItems: 'center' },
@@ -593,9 +556,12 @@
         onClick: function (ev, els) {
           if (!els || !els.length || !stats) return;
           var hrIdx = els[0].index;
-          var tasksHr = stats.filter(function (st) { return st.entries.some(function (e) { return e.dt.getHours() === hrIdx; }); });
+          var hrLabel = labels[hrIdx];
+          var tasksHr = stats.filter(function (st) {
+            return st.entries.some(function (e) { return e.dt.getHours() === hrIdx; });
+          });
           if (!tasksHr.length) return;
-          abrirDrilldownHora(labels[hrIdx] + ' — Atualizações', tasksHr);
+          abrirDrilldownHora(hrLabel + ' — Atualizações', tasksHr);
         }
       }
     });
@@ -1021,6 +987,7 @@
         areaEl.appendChild(h('div', { class: 'tne-card p-4', style: { color: 'var(--tne-muted)', fontSize: '13px', textAlign: 'center' } },
           [h('span', { text: 'Nenhuma TSK com retorno por alarme no período selecionado.' })]));
       } else {
+        // Gráfico por região — lista completa somente no drilldown
         var retRegiaoMap = {};
         retList.forEach(function (item) {
           var rg = (item.task.regiao || 'SEM REGIÃO').toString().trim().toUpperCase();
@@ -1091,32 +1058,37 @@
         areaEl.appendChild(retRgCard);
       }
 
-      // ── OSs ABERTAS + TOP OFENSOR — lado a lado ───────────────────────
+      // ── OSs ABERTAS + TOP OFENSOR — lado a lado ───────────────────
       var rowAbOf = h('div', { class: 'grid gap-4 mb-4', style: { gridTemplateColumns: '1fr 1fr' } });
 
+      // ── OSs ABERTAS (somente Não iniciado / Iniciado) — apenas gráfico ─
       (function () {
         var riskRows = s.filter(function (st) {
           var up = (st.task.status || '').toUpperCase().trim();
           return up === 'INICIADO' || up === 'NÃO INICIADO' || up === 'NAO INICIADO';
-        }).slice(0, 50);
+        });
 
         var secAb = h('div', {});
-        var titleRowAb = h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' } });
-        titleRowAb.appendChild(h('span', { style: { fontSize: '13px', fontWeight: '700', color: '#e74c3c', textTransform: 'uppercase', letterSpacing: '.04em' }, text: 'OSs ABERTAS — TEMPO SEM ATUALIZAÇÃO' }));
-        var abCopyBtn = h('button', { class: 'tne-btn tne-btn-ghost', style: { fontSize: '10px', padding: '2px 8px' }, text: '📋 Copiar' });
-        abCopyBtn.onclick = function () {
-          var lines = ['TSK\tSITE\tEND ID\tPRIO\tÚltima Atualiz.\tSem Atualiz.\tEntradas\tGap Méd.'];
+        var titleAbRow = h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' } });
+        titleAbRow.appendChild(h('div', { class: 'flex items-center gap-2', style: { borderBottom: 'none' } }, [
+          h('span', { style: { width: '4px', height: '16px', borderRadius: '2px', background: '#e74c3c', display: 'inline-block' } }),
+          h('span', { class: 'text-xs font-bold uppercase tracking-widest', style: { color: '#e74c3c' }, text: 'OSs ABERTAS — SEM ATUALIZAÇÃO' })
+        ]));
+        var copyAbBtn = h('button', { class: 'tne-btn tne-btn-ghost', style: { fontSize: '10px', padding: '2px 8px' }, text: '📋 Copiar' });
+        copyAbBtn.onclick = function () {
+          var lines = ['TSK\tSITE\tEND ID\tStatus\tPrioridade\tÚltima Atualiz.\tSem Atualiz.\tEntradas\tGap Médio'];
           riskRows.forEach(function (st) {
             var isPred = st.task.statusSla === 'PREDITIVA' || st.task.fonteSla === 'PREDITIVA';
-            lines.push([st.task.osNumero || '—', st.task.siteId || '—', st.task.enderecoId || '—', isPred ? 'PREDITIVA' : (st.task.prioridade || '—'), fmtDDMM(st.lastDt) + ' ' + fmtHM(st.lastDt), fmtGap(st.horasSemUpd), String(st.nEntries), st.avgGapH != null ? fmtGap(st.avgGapH) : '—'].join('\t'));
+            lines.push([st.task.osNumero || '—', st.task.siteId || '—', st.task.enderecoId || '—', st.task.status || '—', isPred ? 'PREDITIVA' : (st.task.prioridade || '—'), fmtDDMM(st.lastDt) + ' ' + fmtHM(st.lastDt), fmtGap(st.horasSemUpd), st.nEntries, st.avgGapH != null ? fmtGap(st.avgGapH) : '—'].join('\t'));
           });
           copyText(lines.join('\n'));
         };
-        titleRowAb.appendChild(abCopyBtn);
-        secAb.appendChild(titleRowAb);
+        titleAbRow.appendChild(copyAbBtn);
+        secAb.appendChild(titleAbRow);
 
         if (!riskRows.length) {
-          secAb.appendChild(h('div', { class: 'tne-card p-5', style: { color: 'var(--tne-muted)', fontSize: '13px', textAlign: 'center' }, text: 'Nenhuma OS com status "Não iniciado" ou "Iniciado" encontrada.' }));
+          secAb.appendChild(h('div', { class: 'tne-card p-4 text-center', style: { color: 'var(--tne-muted)', fontSize: '12px' },
+            text: 'Nenhuma OS com status "Não iniciado" ou "Iniciado" encontrada.' }));
         } else {
           var abRegiaoMap = {};
           riskRows.forEach(function (st) {
@@ -1127,12 +1099,12 @@
           var abRegioes = Object.keys(abRegiaoMap).sort(function (a, b) { return abRegiaoMap[b].length - abRegiaoMap[a].length; });
           var abRgMax = abRegiaoMap[abRegioes[0]].length;
           var abRgCard = h('div', { class: 'tne-card p-3' });
-          abRgCard.appendChild(h('div', { style: { fontSize: '11px', fontWeight: '600', color: 'var(--tne-muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '.05em' }, text: 'Volume por Região' }));
+          abRgCard.appendChild(h('div', { style: { fontSize: '11px', color: 'var(--tne-muted)', marginBottom: '6px' }, text: riskRows.length + ' OS(s) · clique por região para ver detalhes' }));
           abRegioes.forEach(function (rg) {
             var abSts = abRegiaoMap[rg];
             var barW = Math.round(abSts.length / abRgMax * 100);
             var abRow = h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 4px', cursor: 'pointer', borderRadius: '4px' } });
-            abRow.appendChild(h('span', { style: { width: '120px', fontSize: '11px', color: 'var(--tne-fg)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }, text: rg }));
+            abRow.appendChild(h('span', { style: { width: '130px', fontSize: '11px', color: 'var(--tne-fg)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }, text: rg }));
             abRow.appendChild(h('div', { style: { flex: '1', background: 'rgba(255,255,255,0.07)', borderRadius: '3px', height: '8px', overflow: 'hidden' } }, [
               h('div', { style: { width: barW + '%', height: '100%', background: '#e74c3c', borderRadius: '3px' } })
             ]));
@@ -1142,43 +1114,48 @@
             abRow.addEventListener('mouseleave', function () { abRow.style.background = ''; });
             abRow.addEventListener('click', (function (rgLabel, abSts2) { return function () {
               var wrap = h('div', { style: { maxHeight: '65vh', overflowY: 'auto' } });
-              var mCopyBtn = h('button', { class: 'tne-btn tne-btn-ghost', style: { fontSize: '10px', padding: '2px 8px', marginBottom: '8px' }, text: '📋 Copiar' });
-              mCopyBtn.onclick = function () {
-                var lines = ['TSK\tSITE\tEND ID\tPRIO\tÚltima Atualiz.\tSem Atualiz.\tEntradas\tGap Méd.'];
+              var topRow2 = h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px 10px', borderBottom: '1px solid rgba(255,255,255,0.07)', gap: '8px' } });
+              topRow2.appendChild(h('span', { style: { fontSize: '12px', color: 'var(--tne-muted)' }, text: abSts2.length + ' OS(s) — ' + rgLabel }));
+              var cpBtn2 = h('button', { class: 'tne-btn tne-btn-ghost', style: { fontSize: '10px', padding: '2px 8px' }, text: '📋 Copiar' });
+              cpBtn2.onclick = function () {
+                var lines2 = ['TSK\tSITE\tEND ID\tStatus\tPrioridade\tÚltima Atualiz.\tSem Atualiz.\tEntradas\tGap Médio'];
                 abSts2.forEach(function (st2) {
                   var isPred2 = st2.task.statusSla === 'PREDITIVA' || st2.task.fonteSla === 'PREDITIVA';
-                  lines.push([st2.task.osNumero || '—', st2.task.siteId || '—', st2.task.enderecoId || '—', isPred2 ? 'PREDITIVA' : (st2.task.prioridade || '—'), fmtDDMM(st2.lastDt) + ' ' + fmtHM(st2.lastDt), fmtGap(st2.horasSemUpd), String(st2.nEntries), st2.avgGapH != null ? fmtGap(st2.avgGapH) : '—'].join('\t'));
+                  lines2.push([st2.task.osNumero || '—', st2.task.siteId || '—', st2.task.enderecoId || '—', st2.task.status || '—', isPred2 ? 'PREDITIVA' : (st2.task.prioridade || '—'), fmtDDMM(st2.lastDt) + ' ' + fmtHM(st2.lastDt), fmtGap(st2.horasSemUpd), st2.nEntries, st2.avgGapH != null ? fmtGap(st2.avgGapH) : '—'].join('\t'));
                 });
-                copyText(lines.join('\n'));
+                copyText(lines2.join('\n'));
               };
-              wrap.appendChild(mCopyBtn);
-              wrap.appendChild(h('div', { style: { display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr 0.8fr 1fr 0.8fr 0.6fr 0.6fr auto', gap: '4px', padding: '6px 12px', borderBottom: '1px solid rgba(255,255,255,0.1)', fontSize: '10px', color: 'var(--tne-muted)', fontWeight: '600', textTransform: 'uppercase' } }, [
-                h('span', { text: 'TSK' }), h('span', { text: 'Site' }), h('span', { text: 'END ID' }), h('span', { text: 'Prio' }), h('span', { text: 'Última Atualiz.' }), h('span', { text: 'Sem Atualiz.' }), h('span', { text: 'Entr.' }), h('span', { text: 'Gap Méd.' }), h('span', { text: '' })
+              topRow2.appendChild(cpBtn2);
+              wrap.appendChild(topRow2);
+              // Cabeçalho
+              wrap.appendChild(h('div', { style: { display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr 0.8fr 1fr 0.8fr 0.6fr 0.6fr auto', gap: '4px', padding: '5px 12px', borderBottom: '1px solid rgba(255,255,255,0.07)', fontSize: '10px', color: 'var(--tne-muted)', fontWeight: '600', textTransform: 'uppercase' } }, [
+                h('span', { text: 'TSK' }), h('span', { text: 'Site' }), h('span', { text: 'END ID' }), h('span', { text: 'Prio.' }), h('span', { text: 'Última Atualiz.' }), h('span', { text: 'Sem Atualiz.' }), h('span', { text: 'Entradas' }), h('span', { text: 'Gap Med.' }), h('span', { text: '' })
               ]));
               abSts2.forEach(function (st2) {
-                var urgente = st2.horasSemUpd > 8;
-                var atencao = st2.horasSemUpd > 4;
-                var corGap = urgente ? '#e74c3c' : atencao ? '#f39c12' : 'var(--tne-muted)';
+                var urgente2 = st2.horasSemUpd > 8;
+                var atencao2 = st2.horasSemUpd > 4;
+                var cor2 = urgente2 ? '#e74c3c' : atencao2 ? '#f39c12' : 'var(--tne-muted)';
+                var rowBg2 = urgente2 ? 'rgba(231,76,60,0.05)' : atencao2 ? 'rgba(243,156,18,0.04)' : 'transparent';
                 var isPred2 = st2.task.statusSla === 'PREDITIVA' || st2.task.fonteSla === 'PREDITIVA';
                 var rowM = h('div', {
-                  style: { display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr 0.8fr 1fr 0.8fr 0.6fr 0.6fr auto', gap: '4px', padding: '8px 12px', borderBottom: '1px solid rgba(255,255,255,0.05)', cursor: 'pointer', alignItems: 'center' },
+                  style: { display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr 0.8fr 1fr 0.8fr 0.6fr 0.6fr auto', gap: '4px', alignItems: 'center', padding: '8px 12px', borderBottom: '1px solid rgba(255,255,255,0.05)', cursor: 'pointer', background: rowBg2 },
                   onclick: function () { abrirTimeline(st2); }
                 }, [
-                  h('div', { style: { display: 'flex', alignItems: 'center', gap: '5px' } }, [
+                  h('div', { style: { display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' } }, [
                     h('span', { style: { color: '#ff8c00', fontWeight: '700', fontSize: '12px' }, text: st2.task.osNumero || '—' }),
                     statusBadge(st2.task.status)
                   ]),
-                  h('span', { style: { color: 'var(--tne-muted)', fontSize: '11px' }, text: st2.task.siteId || '—' }),
-                  h('span', { style: { color: 'var(--tne-muted)', fontSize: '11px' }, text: String(st2.task.enderecoId || '—') }),
+                  h('span', { style: { color: 'var(--tne-muted)', fontSize: '11px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }, text: st2.task.siteId || '—' }),
+                  h('span', { style: { color: 'var(--tne-muted)', fontSize: '11px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }, text: String(st2.task.enderecoId || '—') }),
                   h('span', { style: { color: 'var(--tne-muted)', fontSize: '11px' }, text: isPred2 ? 'PREDITIVA' : (st2.task.prioridade || '—') }),
                   h('span', { style: { color: 'var(--tne-muted)', fontSize: '11px' }, text: fmtDDMM(st2.lastDt) + ' ' + fmtHM(st2.lastDt) }),
-                  h('span', { style: { color: corGap, fontWeight: urgente ? '700' : '400', fontSize: '11px' }, text: fmtGap(st2.horasSemUpd) }),
+                  h('span', { style: { color: cor2, fontWeight: urgente2 ? '700' : '400', fontSize: '11px' }, text: fmtGap(st2.horasSemUpd) }),
                   h('span', { style: { color: 'var(--tne-muted)', fontSize: '11px', textAlign: 'center' }, text: String(st2.nEntries) }),
                   h('span', { style: { color: 'var(--tne-muted)', fontSize: '11px' }, text: st2.avgGapH != null ? fmtGap(st2.avgGapH) : '—' }),
                   h('button', { class: 'tne-btn tne-btn-ghost', style: { fontSize: '10px', padding: '2px 6px' }, text: 'TL', onclick: function (e) { e.stopPropagation(); abrirTimeline(st2); } })
                 ]);
-                rowM.addEventListener('mouseenter', function () { rowM.style.background = 'rgba(231,76,60,0.06)'; });
-                rowM.addEventListener('mouseleave', function () { rowM.style.background = ''; });
+                rowM.addEventListener('mouseenter', function () { rowM.style.background = urgente2 ? 'rgba(231,76,60,0.08)' : 'rgba(255,140,0,0.05)'; });
+                rowM.addEventListener('mouseleave', function () { rowM.style.background = rowBg2; });
                 wrap.appendChild(rowM);
               });
               U.openModal('OSs Abertas — ' + rgLabel + ' (' + abSts2.length + ')', wrap);
@@ -1186,107 +1163,119 @@
             abRgCard.appendChild(abRow);
           });
           secAb.appendChild(abRgCard);
-
           if (s.length > riskRows.length) {
-            var verTodasLink = h('div', { style: { textAlign: 'center', marginTop: '8px' } }, [
-              h('button', { class: 'tne-btn tne-btn-ghost', style: { fontSize: '11px', padding: '2px 10px' }, text: 'Ver todas (' + s.length + ') incluindo outros status', onclick: function () { mostrarTodasModal(s); } })
-            ]);
-            secAb.appendChild(verTodasLink);
+            secAb.appendChild(h('div', { style: { marginTop: '8px', textAlign: 'right' } }, [
+              h('button', { class: 'tne-btn tne-btn-ghost', style: { fontSize: '10px', padding: '2px 8px' },
+                text: 'Ver todas (' + s.length + ') incl. outros status',
+                onclick: function () { mostrarTodasModal(s); } })
+            ]));
           }
         }
         rowAbOf.appendChild(secAb);
       })();
 
+      // ── TOP OFENSOR — apenas gráfico de região, lista no drilldown ──
       (function () {
         var topSites = result.topSites || [];
         var secOf = h('div', {});
-        var titleRowOf = h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' } });
-        titleRowOf.appendChild(h('span', { style: { fontSize: '13px', fontWeight: '700', color: '#9b59b6', textTransform: 'uppercase', letterSpacing: '.04em' }, text: 'TOP OFENSOR — SITES COM MAIOR REINCIDÊNCIA' }));
-        var ofCopyBtn = h('button', { class: 'tne-btn tne-btn-ghost', style: { fontSize: '10px', padding: '2px 8px' }, text: '📋 Copiar' });
-        ofCopyBtn.onclick = function () {
-          var lines = ['NE ID\tEND ID\tOSs'];
-          topSites.slice(0, 20).forEach(function (site) { lines.push([site.siteId || '—', site.enderecoId || '—', String(site.count)].join('\t')); });
+        var titleOfRow = h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' } });
+        titleOfRow.appendChild(h('div', { class: 'flex items-center gap-2' }, [
+          h('span', { style: { width: '4px', height: '16px', borderRadius: '2px', background: '#9b59b6', display: 'inline-block' } }),
+          h('span', { class: 'text-xs font-bold uppercase tracking-widest', style: { color: '#9b59b6' }, text: 'TOP OFENSOR — MAIOR REINCIDÊNCIA' })
+        ]));
+        var copyOfBtn = h('button', { class: 'tne-btn tne-btn-ghost', style: { fontSize: '10px', padding: '2px 8px' }, text: '📋 Copiar' });
+        copyOfBtn.onclick = function () {
+          var lines = ['#\tNE ID\tEND ID\tOSs\tRetornos'];
+          topSites.slice(0, 20).forEach(function (site, idx) {
+            var sk3 = (site.enderecoId || '').toString().trim().toUpperCase();
+            var siteDts = retornosPerSite[sk3] || [];
+            lines.push([idx + 1, site.siteId || '—', site.enderecoId || '—', site.count, siteDts.length || '0'].join('\t'));
+          });
           copyText(lines.join('\n'));
         };
-        titleRowOf.appendChild(ofCopyBtn);
-        secOf.appendChild(titleRowOf);
+        titleOfRow.appendChild(copyOfBtn);
+        secOf.appendChild(titleOfRow);
 
         if (!topSites.length) {
-          secOf.appendChild(h('div', { class: 'tne-card p-5', style: { color: 'var(--tne-muted)', fontSize: '13px', textAlign: 'center' }, text: 'Nenhum site reincidente encontrado.' }));
+          secOf.appendChild(h('div', { class: 'tne-card p-4 text-center', style: { color: 'var(--tne-muted)', fontSize: '12px' }, text: 'Nenhum site com reincidência.' }));
         } else {
           var ofRegiaoMap = {};
-          topSites.slice(0, 40).forEach(function (site) {
-            var rg = (site.regiao || site.siteId || 'SEM REGIÃO').toString().trim().toUpperCase();
-            if (!ofRegiaoMap[rg]) ofRegiaoMap[rg] = [];
-            ofRegiaoMap[rg].push(site);
+          topSites.forEach(function (site) {
+            var rg = (site.regiao || 'SEM REGIÃO').toString().trim().toUpperCase();
+            if (!ofRegiaoMap[rg]) ofRegiaoMap[rg] = { count: 0, sites: [] };
+            ofRegiaoMap[rg].count++;
+            ofRegiaoMap[rg].sites.push(site);
           });
-          var ofRegioes = Object.keys(ofRegiaoMap).sort(function (a, b) { return ofRegiaoMap[b].length - ofRegiaoMap[a].length; });
-          var ofRgMax = ofRegiaoMap[ofRegioes[0]].length;
+          var ofRegioes = Object.keys(ofRegiaoMap).sort(function (a, b) { return ofRegiaoMap[b].count - ofRegiaoMap[a].count; });
+          var ofRgMax = ofRegiaoMap[ofRegioes[0]].count;
           var ofRgCard = h('div', { class: 'tne-card p-3' });
-          ofRgCard.appendChild(h('div', { style: { fontSize: '11px', fontWeight: '600', color: 'var(--tne-muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '.05em' }, text: 'Volume por Região' }));
+          ofRgCard.appendChild(h('div', { style: { fontSize: '11px', color: 'var(--tne-muted)', marginBottom: '6px' }, text: topSites.length + ' site(s) · clique por região para ver detalhes' }));
           ofRegioes.forEach(function (rg) {
-            var ofSites = ofRegiaoMap[rg];
-            var barW = Math.round(ofSites.length / ofRgMax * 100);
+            var entry = ofRegiaoMap[rg];
+            var barW = Math.round(entry.count / ofRgMax * 100);
             var ofRow = h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 4px', cursor: 'pointer', borderRadius: '4px' } });
-            ofRow.appendChild(h('span', { style: { width: '120px', fontSize: '11px', color: 'var(--tne-fg)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }, text: rg }));
+            ofRow.appendChild(h('span', { style: { width: '130px', fontSize: '11px', color: 'var(--tne-fg)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }, text: rg }));
             ofRow.appendChild(h('div', { style: { flex: '1', background: 'rgba(255,255,255,0.07)', borderRadius: '3px', height: '8px', overflow: 'hidden' } }, [
               h('div', { style: { width: barW + '%', height: '100%', background: '#9b59b6', borderRadius: '3px' } })
             ]));
-            ofRow.appendChild(h('span', { style: { fontSize: '11px', color: '#9b59b6', fontWeight: '700', minWidth: '28px', textAlign: 'right' }, text: String(ofSites.length) }));
+            ofRow.appendChild(h('span', { style: { fontSize: '11px', color: '#9b59b6', fontWeight: '700', minWidth: '28px', textAlign: 'right' }, text: String(entry.count) }));
             ofRow.appendChild(h('span', { style: { fontSize: '12px', color: 'var(--tne-muted)', paddingLeft: '4px' }, text: '›' }));
             ofRow.addEventListener('mouseenter', function () { ofRow.style.background = 'rgba(155,89,182,0.06)'; });
             ofRow.addEventListener('mouseleave', function () { ofRow.style.background = ''; });
-            ofRow.addEventListener('click', (function (rgLabel, ofSites2) { return function () {
+            ofRow.addEventListener('click', (function (rgLabel, entry2) { return function () {
               var wrap = h('div', { style: { maxHeight: '65vh', overflowY: 'auto' } });
-              var mCopyBtn = h('button', { class: 'tne-btn tne-btn-ghost', style: { fontSize: '10px', padding: '2px 8px', marginBottom: '8px' }, text: '📋 Copiar' });
-              mCopyBtn.onclick = function () {
-                var lines = ['#\tNE ID\tEND ID\tOSs\tRetornos'];
-                ofSites2.forEach(function (site, idx) {
-                  var sk3 = (site.enderecoId || '').toString().trim().toUpperCase();
-                  var siteDts = retornosPerSite[sk3] || [];
-                  lines.push([(idx + 1), site.siteId || '—', site.enderecoId || '—', String(site.count), String(siteDts.length)].join('\t'));
+              var topRow3 = h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px 10px', borderBottom: '1px solid rgba(255,255,255,0.07)', gap: '8px' } });
+              topRow3.appendChild(h('span', { style: { fontSize: '12px', color: 'var(--tne-muted)' }, text: entry2.sites.length + ' site(s) — ' + rgLabel }));
+              var cpBtn3 = h('button', { class: 'tne-btn tne-btn-ghost', style: { fontSize: '10px', padding: '2px 8px' }, text: '📋 Copiar' });
+              cpBtn3.onclick = function () {
+                var lines3 = ['#\tNE ID\tEND ID\tOSs\tRetornos'];
+                entry2.sites.forEach(function (site2, i2) {
+                  var sk4 = (site2.enderecoId || '').toString().trim().toUpperCase();
+                  var siteDts2 = retornosPerSite[sk4] || [];
+                  lines3.push([i2 + 1, site2.siteId || '—', site2.enderecoId || '—', site2.count, siteDts2.length].join('\t'));
                 });
-                copyText(lines.join('\n'));
+                copyText(lines3.join('\n'));
               };
-              wrap.appendChild(mCopyBtn);
-              var maxOfCount = ofSites2.length ? ofSites2[0].count : 1;
-              wrap.appendChild(h('div', { style: { display: 'grid', gridTemplateColumns: '28px 1fr 1fr 0.6fr 0.8fr 1fr', gap: '4px', padding: '6px 12px', borderBottom: '1px solid rgba(255,255,255,0.1)', fontSize: '10px', color: 'var(--tne-muted)', fontWeight: '600', textTransform: 'uppercase' } }, [
+              topRow3.appendChild(cpBtn3);
+              wrap.appendChild(topRow3);
+              // Cabeçalho
+              wrap.appendChild(h('div', { style: { display: 'grid', gridTemplateColumns: '28px 1fr 1fr 0.6fr 0.8fr 1fr', gap: '4px', padding: '5px 12px', borderBottom: '1px solid rgba(255,255,255,0.07)', fontSize: '10px', color: 'var(--tne-muted)', fontWeight: '600', textTransform: 'uppercase' } }, [
                 h('span', { text: '#' }), h('span', { text: 'NE ID' }), h('span', { text: 'END ID' }), h('span', { text: 'OSs' }), h('span', { text: 'Reincid.' }), h('span', { text: 'Retornos' })
               ]));
-              ofSites2.forEach(function (site, idx) {
-                var barPct = Math.round(site.count / maxOfCount * 100);
-                var cor = idx === 0 ? '#e74c3c' : idx < 3 ? '#e67e22' : '#9b59b6';
-                var sk3 = (site.enderecoId || '').toString().trim().toUpperCase();
-                var siteDts = retornosPerSite[sk3] || [];
-                var rowM = h('div', { style: { display: 'grid', gridTemplateColumns: '28px 1fr 1fr 0.6fr 0.8fr 1fr', gap: '4px', padding: '8px 12px', borderBottom: '1px solid rgba(255,255,255,0.05)', alignItems: 'center' } }, [
-                  h('span', { style: { color: 'var(--tne-muted)', fontWeight: '600', fontSize: '11px' }, text: String(idx + 1) }),
-                  h('span', { style: { color: '#ff8c00', fontWeight: '600', fontSize: '12px' }, text: String(site.siteId || '—') }),
-                  h('span', { style: { color: 'var(--tne-muted)', fontSize: '11px' }, text: String(site.enderecoId || '—') }),
-                  h('span', { style: { color: cor, fontWeight: '700', fontSize: '12px', textAlign: 'center' }, text: String(site.count) }),
-                  h('div', { style: { background: 'rgba(255,255,255,0.08)', borderRadius: '4px', height: '8px', overflow: 'hidden' } }, [
-                    h('div', { style: { width: barPct + '%', height: '100%', background: cor, borderRadius: '4px' } })
+              entry2.sites.forEach(function (site2, i2) {
+                var cor2 = i2 === 0 ? '#e74c3c' : i2 < 3 ? '#e67e22' : '#9b59b6';
+                var sk4 = (site2.enderecoId || '').toString().trim().toUpperCase();
+                var siteDts2 = retornosPerSite[sk4] || [];
+                var maxCt = entry2.sites[0].count;
+                var barPct2 = Math.round(site2.count / maxCt * 100);
+                var rowM2 = h('div', { style: { display: 'grid', gridTemplateColumns: '28px 1fr 1fr 0.6fr 0.8fr 1fr', gap: '4px', alignItems: 'center', padding: '8px 12px', borderBottom: '1px solid rgba(255,255,255,0.05)' } }, [
+                  h('span', { style: { color: cor2, fontWeight: '700', fontSize: '12px' }, text: String(i2 + 1) }),
+                  h('span', { style: { color: '#ff8c00', fontWeight: '600', fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }, text: String(site2.siteId || '—') }),
+                  h('span', { style: { color: 'var(--tne-muted)', fontSize: '11px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }, text: String(site2.enderecoId || '—') }),
+                  h('span', { style: { color: cor2, fontWeight: '700', textAlign: 'center' }, text: String(site2.count) }),
+                  h('div', { style: { background: 'rgba(255,255,255,0.08)', borderRadius: '3px', height: '7px', overflow: 'hidden' } }, [
+                    h('div', { style: { width: barPct2 + '%', height: '100%', background: cor2, borderRadius: '3px' } })
                   ]),
-                  siteDts.length ? h('button', {
-                    class: 'tne-btn tne-btn-ghost',
-                    style: { fontSize: '10px', padding: '2px 8px' },
-                    text: siteDts.length + ' retorno(s)',
-                    onclick: (function (dts, eid) { return function (e) {
+                  siteDts2.length ? h('button', {
+                    class: 'tne-btn tne-btn-ghost', style: { fontSize: '10px', padding: '2px 7px' },
+                    text: siteDts2.length + ' retorno(s)',
+                    onclick: (function (dts2, eid2) { return function (e) {
                       e.stopPropagation();
-                      var w2 = h('div', { style: { maxHeight: '50vh', overflowY: 'auto' } });
-                      dts.slice().sort(function (a, b) { return b.dt - a.dt; }).forEach(function (d) {
-                        w2.appendChild(h('div', { style: { padding: '7px 12px', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: '12px', display: 'flex', gap: '10px', alignItems: 'center' } }, [
+                      var wrap2 = h('div', { style: { maxHeight: '50vh', overflowY: 'auto' } });
+                      dts2.slice().sort(function (a, b) { return b.dt - a.dt; }).forEach(function (d) {
+                        wrap2.appendChild(h('div', { style: { padding: '7px 12px', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: '12px', display: 'flex', gap: '10px', alignItems: 'center' } }, [
                           h('span', { style: { color: '#ff8c00', fontWeight: '600', minWidth: '130px' }, text: d.osNumero }),
                           h('span', { style: { color: 'var(--tne-muted)' }, text: fmtDDMM(d.dt) + ' às ' + fmtHM(d.dt) })
                         ]));
                       });
-                      U.openModal('Retornos por Alarme — ' + eid, w2);
-                    }; })(siteDts, site.enderecoId || sk3)
+                      U.openModal('Retornos por Alarme — ' + eid2, wrap2);
+                    }; })(siteDts2, site2.enderecoId || sk4)
                   }) : h('span', { style: { color: 'var(--tne-muted)', fontSize: '11px' }, text: '—' })
                 ]);
-                wrap.appendChild(rowM);
+                wrap.appendChild(rowM2);
               });
-              U.openModal('Top Ofensor — ' + rgLabel + ' (' + ofSites2.length + ')', wrap);
-            }; })(rg, ofSites));
+              U.openModal('Top Ofensor — ' + rgLabel + ' (' + entry2.sites.length + ' sites)', wrap);
+            }; })(rg, entry));
             ofRgCard.appendChild(ofRow);
           });
           secOf.appendChild(ofRgCard);
