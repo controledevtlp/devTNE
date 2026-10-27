@@ -421,7 +421,8 @@
       vencimentoCalc: t.vencimentoCalc, fimCalc: t.fimCalc,
       statusSla: t.statusSla, fonteSla: t.fonteSla, motivoCancelamento: t.motivoCancelamento,
       habilidadeTrabalho: t.habilidadeTrabalho,  // KPI "GMGs na Fila" (siteGERAL / público)
-      isocDJ: t.isocDJ                           // tipo de cliente — define B2B/Premium na aba Prioritários
+      isocDJ: t.isocDJ,                          // tipo de cliente — define B2B/Premium na aba Prioritários
+      evento: t.evento                           // coluna GF — máscara/mensagem de associação (Causa comum)
     };
   }
 
@@ -521,12 +522,14 @@
 
       // Controle de Retorno: os episódios saem do histórico de linhas das TSKs (só o painel autenticado tem), então são calculados aqui
       // e vão enxutos no snapshot para o dashboard público e o devGERAL. Os apelidos de caminho/motivo (CONFIG da planilha) vão junto.
-      var retorno = null, retornoApelidos = null;
+      var retorno = null, retornoApelidos = null, reabertas = null;
       try {
         if (TNE.retorno && TNE.retorno.compactar) {
           var rr = TNE.retorno.analisar(data.tasksEnriched || []);
           if (rr.temCampos) retorno = TNE.retorno.compactar(rr.eventos);
         }
+        // TSKs encerradas que voltaram à fila (reabertas)
+        if (TNE.retorno && TNE.retorno.compactarReabertas) reabertas = TNE.retorno.compactarReabertas(TNE.retorno.analisarReabertas(data.tasksEnriched || []).eventos);
         var apel = tryLS('tne_retorno_apelidos') || {};
         if (!_apelCache || Date.now() - _apelCache.t > 300000) {
           _apelCache = { t: Date.now(), v: null };
@@ -551,7 +554,8 @@
         mapaFoSlim:        foSlim,
         prodHistory:       prodHistory,
         retorno:           retorno,                    // Controle de Retorno (formato enxuto de TNE.retorno.compactar)
-        retornoApelidos:   retornoApelidos
+        retornoApelidos:   retornoApelidos,
+        reabertas:         reabertas                   // TSKs encerradas que voltaram à fila (TNE.retorno.compactarReabertas)
       };
       var jsonStr = JSON.stringify(payload);
       if (jsonStr === _ultimoSnapshotJSON) return;
