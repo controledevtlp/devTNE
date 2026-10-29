@@ -300,7 +300,20 @@
       var statusPasta = infoRow('📁', 'Buscando pasta conectada...', 'var(--tne-muted)');
       pastaCard.appendChild(statusPasta);
       FS.folderName().then(function (nome) {
-        setInfoRow(statusPasta, '📁', nome ? (nome + ' — pronta para leitura') : 'Nenhuma pasta conectada ainda.', nome ? 'var(--tne-green)' : 'var(--tne-muted)');
+        if (!nome) { setInfoRow(statusPasta, '📁', 'Nenhuma pasta conectada ainda.', 'var(--tne-muted)'); return; }
+        // Verifica se a permissão ainda está ativa (pode expirar após recarregar a página).
+        // Se estiver "prompt", avisa o usuário para clicar em "Verificar agora" uma vez.
+        if (FS.queryFolderPermission) {
+          FS.queryFolderPermission().then(function (perm) {
+            if (perm === 'granted') {
+              setInfoRow(statusPasta, '📁', nome + ' — pronta para leitura', 'var(--tne-green)');
+            } else {
+              setInfoRow(statusPasta, '⚠️', nome + ' — acesso expirou; clique em "Verificar agora" para reativar', '#f39c12');
+            }
+          });
+        } else {
+          setInfoRow(statusPasta, '📁', nome + ' — pronta para leitura', 'var(--tne-green)');
+        }
       });
       // duas linhas informativas fixas, com ícone — deixam claro o
       // comportamento automático sem precisar abrir nenhum menu.
@@ -339,15 +352,16 @@
       pastaCard.appendChild(U.h('p', { class: 'text-xs mt-1', style: { color: 'var(--tne-muted)' }, text: '💡 Pasta de Downloads com muitos arquivos antigos deixa a verificação mais lenta — conectar uma pasta menor e dedicada ajuda.' }));
     }
     container.appendChild(tarefasGrid);
+    container.appendChild(pastaCard);
 
     // =====================================================================
     // SEÇÃO 2 — INCIDENTES (SITES FORA)
     // =====================================================================
     container.appendChild(secaoTitulo('🚨 Incidentes (Sites Fora)', C.CORES_TNE.blue));
 
-    // --- ação primária + leitura automática da pasta — lado a lado ---
+    // --- ação primária: busca automática via Ponte TNE ---
     var autoCard = U.h('div', {
-      class: 'tne-card p-6',
+      class: 'tne-card p-6 mb-3',
       style: { border: '1px solid rgba(46,204,113,.3)', background: 'rgba(46,204,113,.05)' }
     });
     autoCard.appendChild(U.h('div', { class: 'flex items-center gap-2 mb-1' }, [
@@ -359,10 +373,7 @@
       class: 'tne-btn tne-btn-lg clickable', style: { background: C.CORES_TNE.green, borderColor: C.CORES_TNE.green, color: '#0a160f' },
       html: '🔄 Buscar incidentes agora', onclick: function () { buscarAutomatico(data, app); }
     }));
-    var incidentGrid = U.h('div', { class: 'grid grid-cols-1 lg:grid-cols-2 gap-4 mb-3' });
-    incidentGrid.appendChild(autoCard);
-    incidentGrid.appendChild(pastaCard);
-    container.appendChild(incidentGrid);
+    container.appendChild(autoCard);
 
     // --- opções manuais, escondidas por padrão (<details> nativo: some sem perder o texto digitado) ---
     var details = U.h('details', { class: 'tne-details tne-card p-5' });

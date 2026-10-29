@@ -536,6 +536,15 @@
   // duplicar o número em dois lugares.
   F.getMonitorIntervalMs = function () { return monitor.interval; };
 
+  // Consulta o estado da permissão da pasta conectada sem precisar de gesto do usuário.
+  // Retorna 'granted', 'prompt', 'denied' ou null (sem pasta conectada / erro).
+  F.queryFolderPermission = async function () {
+    var handle = await idbGet(IDB_KEY);
+    if (!handle) return null;
+    try { return await handle.queryPermission({ mode: 'readwrite' }); }
+    catch (e) { return null; }
+  };
+
   F.previewFile = async function (file) {
     var buf = await file.arrayBuffer();
     var parsed = parseArrayBuffer(buf, file.name);
