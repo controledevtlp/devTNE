@@ -5,7 +5,11 @@
  * domínio do sistema (dedupPorTsk, corretiva, backlog, último update humano). Não altera nada
  * dos dashboards existentes e não cria backend novo.
  *
- * Abas: Fazer agora · Sites fora · B2B / Premium · Concentradores · Backbone / LD · Mapa
+ * Abas: Fazer agora · Bloco de notas (P - vencimento - TSK / SITE + linha do tempo dos updates, com cópia completa) ·
+ *       Sem update +1h30 · Sites fora · B2B / Premium · Concentradores · Backbone / LD · Mapa
+ * Alerta de TSK NOVA: aparece no snapshot depois da 1ª abertura e ainda sem update → faixa vermelha + sirene (WebAudio)
+ * na(s) região(ões) E equipe (FIXA / MÓVEL) filtradas (ou em todas, sem filtro) até o 1º update. O som toca só quando a TSK cai
+ * (sem lembretes); "Silenciar" cala por 10 min.
  * Filtros: regra criadora (FIXA / MÓVEL — coluna DJ), prioridade, situação, regiões (chips), busca.
  * Visão por região: cada região é um bloco (lado a lado quando há mais de uma), com botão de cópia
  * ("Prioridade -> TSK / SITE - FALHA") logo acima.
@@ -22,8 +26,10 @@
 
   var LS_KEY = 'tne_operador_v2';
   var POLL_MS = 60000, TICK_MS = 30000, STALE_MIN = 20, PAGE = 40;
+  var UPD_LIM_H = 1.5;            // "sem update": mais de 1h30 desde o último update do operador
+  var SONECA_MS = 600000;         // "Silenciar" cala a sirene por 10 min (o alerta visual continua)
   var SEMKEY = '__SEM__';
-  var TABS = ['fila', 'sites', 'causa', 'retorno', 'b2b', 'conc', 'backbone', 'mapa'];
+  var TABS = ['fila', 'notas', 'semupd', 'sites', 'causa', 'retorno', 'b2b', 'conc', 'backbone', 'mapa'];
   function temRetorno() { return !!(TNE.retorno && TNE.pages && TNE.pages.controleRetorno); }
   function temCausa() { return !!(TNE.causaComum && TNE.causaComum.disponivel()); }   // piloto: só onde há topologia carregada
   var COR = { red: '#c62839', amber: '#d68910', green: '#168a47', blue: '#1f6fb5', purple: '#7d3c98', gray: '#6b7280', orange: '#b85a00' };
@@ -40,9 +46,170 @@
   var LS_COORD_PEND = 'tne_operador_coords_pend', LS_COORD_LOCAL = 'tne_operador_coords_local', LS_PIN = 'tne_operador_pin';
   var coordCache = { src: null, idx: null };
 
+  /* ---------- TSKs NOVAS (aguardando o 1º update) + alerta visual e sonoro ----------
+     "Nova" = apareceu no snapshot depois da primeira abertura neste aparelho e ainda não tem nenhum update.
+     Continua nova (e o alerta continua na tela) até receber o PRIMEIRO update — ou sair da fila.
+     A primeira abertura só registra o que já existe (não alerta o backlog inteiro).
+     O alerta vale para a(s) região(ões) filtrada(s); sem filtro de região, vale para todas. */
+  var LS_VISTAS = 'tne_operador_vistas', LS_NOVAS = 'tne_operador_novas';
+  var vistas = lsGet(LS_VISTAS), novas = lsGet(LS_NOVAS) || {};       // os -> instante em que foi vista / detectada como nova
+  var alerta = { soneca: 0, bloqueado: false };
+  var audio = { ctx: null, fontes: [], buf: undefined };
+  /* toque do alerta: a gravação do operador. Salve o arquivo em assets/ com um destes nomes (a 1ª que existir é usada);
+     sem arquivo (ou se não abrir), toca a sirene sintética. */
+  var AUDIO_ALERTA = ['assets/alerta-operador.mp3', 'assets/alerta-operador.wav', 'assets/alerta-operador.ogg', 'assets/alerta-operador.m4a'];
+
+  function detectarNovas() {
+    var agora = Date.now(), primeira = !vistas, achadas = [];
+    vistas = vistas || {};
+    model.items.forEach(function (it) {
+      if (it.pend) return;
+      var os = up(it.os); if (!os) return;
+      if (!(os in vistas)) {
+        vistas[os] = agora;
+        if (!primeira && it.upd.estado === 'sem' && !(os in novas)) { novas[os] = agora; achadas.push(it); }
+      }
+    });
+    Object.keys(novas).forEach(function (os) {          // sai da lista quando recebe o 1º update ou deixa a fila
+      var it = model.byOs[os];
+      if (!it || it.pend || it.upd.estado !== 'sem') delete novas[os];
+    });
+    Object.keys(vistas).forEach(function (os) { if (!model.byOs[os] && agora - vistas[os] > 72 * 3600000) delete vistas[os]; });
+    try { localStorage.setItem(LS_VISTAS, JSON.stringify(vistas)); localStorage.setItem(LS_NOVAS, JSON.stringify(novas)); } catch (e) {}
+    return achadas;
+  }
+  /* mesmo critério do filtro FIXA / MÓVEL (e das "Regras criadoras") da fila: sem filtro de equipe, vale para todas */
+  function passaGrupo(it) {
+    if (state.regras.length) return state.regras.indexOf(regraKey(it)) >= 0;
+    return state.grupo === 'TODAS' || it.regra.grupo === state.grupo;
+  }
+  function novasEscopo() {
+    if (!model) return [];
+    var out = [];
+    Object.keys(novas).forEach(function (os) {
+      var it = model.byOs[os];
+      if (it && !it.pend && (!state.regioes.length || state.regioes.indexOf(it.regiao) >= 0) && passaGrupo(it)) out.push(it);
+    });
+    out.sort(function (a, b) { return (prioNum(a.prio) - prioNum(b.prio)) || ((a.criacao ? a.criacao.getTime() : 0) - (b.criacao ? b.criacao.getTime() : 0)); });
+    return out;
+  }
+  function ehNova(it) { return !!novas[up(it.os)] && !it.pend; }
+
+  /* sirene gerada no navegador (sem arquivo de áudio). Navegadores só liberam som depois de um clique na página. */
+  function liberarAudio() {
+    try {
+      if (!audio.ctx) { var AC = window.AudioContext || window.webkitAudioContext; if (!AC) return Promise.resolve(false); audio.ctx = new AC(); }
+      if (audio.ctx.state === 'running') return Promise.resolve(true);
+      return audio.ctx.resume().then(function () { return audio.ctx.state === 'running'; }, function () { return false; });
+    } catch (e) { return Promise.resolve(false); }
+  }
+  function pararSirene() { audio.fontes.forEach(function (s) { try { s.stop(); } catch (e) {} }); audio.fontes = []; }
+  /* carrega (uma vez) a gravação do alerta; null = não há arquivo utilizável → usa a sirene sintética */
+  function carregarGravacao() {
+    if (audio.buf !== undefined) return Promise.resolve(audio.buf);
+    var i = 0;
+    function tenta() {
+      if (i >= AUDIO_ALERTA.length) { audio.buf = null; return null; }
+      return fetch(AUDIO_ALERTA[i++]).then(function (r) { if (!r.ok) throw new Error('sem arquivo'); return r.arrayBuffer(); })
+        .then(function (ab) { return new Promise(function (res, rej) { audio.ctx.decodeAudioData(ab, res, rej); }); })
+        .then(function (buf) { audio.buf = buf; return buf; }, tenta);
+    }
+    return Promise.resolve(tenta()).then(function (b) { return b || null; }, function () { audio.buf = null; return null; });
+  }
+  function sireneSintetica(c, dur) {
+    var t0 = c.currentTime, osc = c.createOscillator(), g = c.createGain();
+    osc.type = 'sawtooth'; osc.connect(g); g.connect(c.destination);
+    for (var t = 0; t < dur; t += 1.2) {                // sobe e desce entre 650 e 1150 Hz, 1,2 s por ciclo
+      osc.frequency.setValueAtTime(650, t0 + t); osc.frequency.linearRampToValueAtTime(1150, t0 + t + 0.6); osc.frequency.linearRampToValueAtTime(650, t0 + t + 1.2);
+    }
+    g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(0.2, t0 + 0.08);
+    g.gain.setValueAtTime(0.2, t0 + dur - 0.2); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    osc.start(t0); osc.stop(t0 + dur + 0.05); audio.fontes.push(osc);
+  }
+  function tocarGravacao(c, buf, vezes) {
+    var t = c.currentTime + 0.05;
+    for (var i = 0; i < vezes; i++) {
+      var s = c.createBufferSource(); s.buffer = buf; s.connect(c.destination); s.start(t); audio.fontes.push(s);
+      t += buf.duration + 0.7;
+    }
+  }
+  /* toca a gravação (vezes = quantas vezes seguidas) ou, sem arquivo, a sirene sintética por `seg` segundos */
+  function tocarSirene(seg, vezes) {
+    if (!state.som) return;
+    liberarAudio().then(function (ok) {
+      var mudou = alerta.bloqueado !== !ok; alerta.bloqueado = !ok;
+      if (mudou) atualizarFaixaAlerta();
+      if (!ok) return;
+      return carregarGravacao().then(function (buf) {
+        pararSirene();
+        if (buf) tocarGravacao(audio.ctx, buf, vezes || 1); else sireneSintetica(audio.ctx, seg || 8);
+      });
+    });
+  }
+  function alternarSom() {
+    state.som = !state.som; saveState();
+    if (state.som) liberarAudio().then(function (ok) { alerta.bloqueado = !ok; if (ok) tocarSirene(1.8, 1); if (model) render(true); });
+    else { pararSirene(); if (model) render(true); }
+  }
+  function silenciar() { pararSirene(); alerta.soneca = Date.now() + SONECA_MS; atualizarFaixaAlerta(); }
+  /* tocou a sirene? só para TSKs novas que entraram AGORA e estão no escopo da região filtrada */
+  function dispararAlerta(achadas) {
+    var no = {}; novasEscopo().forEach(function (it) { no[up(it.os)] = 1; });
+    if (!achadas.some(function (it) { return no[up(it.os)]; })) return;
+    if (Date.now() >= alerta.soneca) tocarSirene(8, 2);
+  }
+  function faixaAlerta() {
+    var lista = novasEscopo(); if (!lista.length) return null;
+    var esc = state.regioes.length ? state.regioes.map(regiaoLabel).join(' + ') : 'todas as regiões', calada = Date.now() < alerta.soneca;
+    if (state.regras.length) esc += ' · ' + state.regras.length + (state.regras.length > 1 ? ' regras criadoras' : ' regra criadora');
+    else if (state.grupo !== 'TODAS') esc += ' · ' + (state.grupo === 'FIXA' ? 'FIXA' : 'MÓVEL');
+    var chips = lista.slice(0, 10).map(function (it) {
+      return h('span', { class: 'op-achip' }, [h('b', { style: { color: PRIO_COR[it.prio] || 'inherit' }, text: it.prio }), h('span', { class: 'op-tsk', dataset: { os: it.os }, text: it.os }), h('span', { text: it.site || it.end || '—' })]);
+    });
+    if (lista.length > 10) chips.push(h('span', { class: 'op-achip', text: '+ ' + (lista.length - 10) }));
+    var acts = [h('button', { class: 'op-btn', type: 'button', text: 'Ver só as novas', onclick: function () { setSit('NOVAS'); } })];
+    if (state.som && !calada) acts.push(h('button', { class: 'op-btn', type: 'button', text: 'Silenciar 10 min', title: 'Cala a sirene; o alerta na tela continua até o 1º update', onclick: silenciar }));
+    if (!state.som) acts.push(h('button', { class: 'op-btn go', type: 'button', text: 'Ligar alerta sonoro', onclick: alternarSom }));
+    var dica = null;
+    if (state.som && alerta.bloqueado) dica = 'O navegador bloqueou o som: clique em qualquer lugar da página para liberar a sirene.';
+    else if (state.som && calada) dica = 'Sirene silenciada até ' + new Date(alerta.soneca).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) + '.';
+    return h('div', { class: 'op-alerta', id: 'op-alerta' }, [
+      h('span', { class: 'op-sirene' }),
+      h('div', { class: 'op-ainfo' }, [
+        h('b', { text: lista.length + (lista.length > 1 ? ' NOVAS TSKS' : ' NOVA TSK') + ' PARA ACIONAMENTO' }),
+        h('span', { class: 'op-aesc', text: ' · ' + esc + ' · aguardando o 1º update' }),
+        h('div', { class: 'op-achips' }, chips),
+        dica ? h('div', { class: 'op-ahint', text: dica }) : null
+      ]),
+      h('div', { class: 'op-aacts' }, acts)
+    ]);
+  }
+  function atualizarFaixaAlerta() {
+    if (!model) return;
+    var velha = document.getElementById('op-alerta'), nova = faixaAlerta();
+    if (velha && nova) velha.replaceWith(nova);
+    else if (velha) velha.remove();
+    else if (nova) { var ancora = root.querySelector('.op-tabs'); if (ancora) root.insertBefore(nova, ancora); }
+    if (nova && TNE.theme && TNE.theme.adapt) TNE.theme.adapt(nova);
+  }
+
+  /* ---------- BLOCO DE NOTAS: "P - VENCIMENTO - TSK / SITE" + linha do tempo das atualizações (mais recente em cima) ---------- */
+  function p2(n) { return (n < 10 ? '0' : '') + n; }
+  function fmtDM(d) { return d ? p2(d.getDate()) + '/' + p2(d.getMonth() + 1) + ' ' + p2(d.getHours()) + ':' + p2(d.getMinutes()) : '—'; }
+  function msg1(s) { return String(s == null ? '' : s).replace(/\s+/g, ' ').trim(); }
+  function entradasDe(it) {       // updates reais (operador / técnico), da mais recente para a mais antiga
+    if (!it._ent) it._ent = U.ultimasEntradasDiario ? U.ultimasEntradasDiario(it.t.motivoCancelamento, 300) : [];
+    return it._ent;
+  }
+  function textoNota(it, n) {
+    var ent = entradasDe(it); if (n) ent = ent.slice(0, n);
+    var cab = (it.pend ? it.prio + ' (PEND)' : it.prio) + ' - ' + (it.venc ? fmtDM(it.venc) : 'sem prazo') + ' - ' + it.os + ' / ' + (it.site || it.end || '—');
+    return cab + '\n' + (ent.length ? ent.map(function (e) { return '   ' + fmtDM(e.dt) + ' - ' + msg1(e.mensagem); }).join('\n') : '   (sem atualização)');
+  }
+
   /* ---------- estado dos filtros (lembrado no navegador) ---------- */
   var state = (function () {
-    var d = { tab: 'fila', grupo: 'TODAS', regras: [], prios: [], situacao: 'TODAS', regioes: [], ordem: 'padrao', pend: false, lado: true };
+    var d = { tab: 'fila', grupo: 'TODAS', regras: [], prios: [], situacao: 'TODAS', regioes: [], ordem: 'padrao', pend: false, lado: true, som: false, hist: 0 };
     try { var s = JSON.parse(localStorage.getItem(LS_KEY) || 'null'); if (s) Object.keys(d).forEach(function (k) { if (s[k] !== undefined) d[k] = s[k]; }); } catch (e) {}
     if (TABS.indexOf(d.tab) < 0 || (d.tab === 'causa' && !temCausa()) || (d.tab === 'retorno' && !temRetorno())) d.tab = 'fila';
     d.busca = ''; d.lim = {};
@@ -150,7 +317,9 @@
     if (mudou || !loadedOnce || estavaEmCache) {
       var primeira = !loadedOnce;
       erroCarga = null; buildModel(); loadedOnce = true;
+      var novasAgora = detectarNovas();
       if (!(state.tab === 'mapa' && view.rotaAtiva)) render(!primeira); else atualizarIdade();   // não destrói a rota que está na tela
+      if (novasAgora.length) dispararAlerta(novasAgora);
     } else atualizarIdade();
   }
   /* última versão do snapshot guardada neste aparelho: a tela abre na hora e atualiza quando o download termina
@@ -300,6 +469,8 @@
         case 'V2H': return !it.pend && rest != null && rest >= 0 && rest <= 120;
         case 'NO_PRAZO': return !it.pend && rest != null && rest >= 0;
         case 'SEMUPD': return !it.pend && semUpdH(it, now) > 4;
+        case 'SEMUPD90': return !it.pend && semUpdH(it, now) > UPD_LIM_H;
+        case 'NOVAS': return ehNova(it);
         default: return true;
       }
     });
@@ -311,6 +482,22 @@
     });
     if (!state.regioes.length) blocos = blocos.filter(function (b) { return b.lista.length; });
     return { base: base, filtrada: filtrada, blocos: blocos };
+  }
+  /* aba "Sem update +1h30": TSKs (fora as pendenciadas) sem update do operador há mais de 1h30, a mais parada primeiro */
+  function semUpdAtual(now) {
+    var q = up(state.busca), porReg = {}, total = 0;
+    model.items.filter(passBase).forEach(function (it) {
+      if (it.pend) return;
+      if (q && (up(it.os) + ' ' + up(it.site) + ' ' + up(it.end) + ' ' + up(it.cidade)).indexOf(q) < 0) return;
+      var hh = semUpdH(it, now); if (hh <= UPD_LIM_H) return;
+      it._rest = restOf(it, now); it._sem = hh; total++;
+      (porReg[it.regiao] = porReg[it.regiao] || []).push(it);
+    });
+    var blocos = regioesBlocos(state.regioes.length ? state.regioes : Object.keys(porReg)).map(function (r) {
+      return { regiao: r, lista: (porReg[r] || []).sort(function (a, b) { return b._sem - a._sem; }) };
+    });
+    if (!state.regioes.length) blocos = blocos.filter(function (b) { return b.lista.length; });
+    return { total: total, blocos: blocos };
   }
   /* total de SITES (um END_ID pode agrupar vários sites; s.qtd = quantos) */
   function somaSites(lista, fn) { var n = 0; lista.forEach(function (s) { if (!fn || fn(s)) n += (s.qtd || 1); }); return n; }
@@ -690,27 +877,62 @@
   /* ---------- componentes ---------- */
   function tag(txt, cor, title) { return h('span', { class: 'op-tag', style: { background: cor }, title: title || null, text: txt }); }
 
-  function rowFila(it, now) {
-    var rest = it._rest != null ? it._rest : restOf(it, now), cor = it.pend ? COR.purple : corTempo(rest), pct = pctPrazo(it, now);
+  function tagsDe(it, now) {
     var tags = [];
+    if (ehNova(it)) tags.push(tag('NOVA', COR.red, 'Nova: aguardando o 1º update'));
     if (it.regra.grupo) tags.push(tag(it.regra.grupo === 'FIXA' ? 'FIXA' : 'MÓVEL', it.regra.grupo === 'FIXA' ? COR.blue : COR.green, it.regra.nome));
     if (it.fora) tags.push(tag('SITE FORA', COR.red, 'Este site está fora' + (it.fora.desde ? ' há ' + fmtDur((now - it.fora.desde.getTime()) / 60000) : '')));
     if (it.b2b) tags.push(tag('B2B', COR.purple, 'B2B / Premium'));
     if (it.pend) tags.push(tag('PEND', COR.purple, 'Pendenciada'));
-    if (firstSeen[it.os] > 0 && now - firstSeen[it.os] < 300000) tags.push(tag('NOVA', COR.red, 'Entrou na fila nos últimos 5 min'));
     if (!it.pend && semUpdH(it, now) > 4) tags.push(tag('S/ UPD', COR.orange, 'Sem atualização do operador há mais de 4h'));
-    var tempo = it.pend ? 'pendenciada' : (rest == null ? 'sem prazo' : (rest < 0 ? 'atrasada ' : 'vence em ') + fmtDur(rest));
+    return tags;
+  }
+  /* modo 'semupd': a coluna da direita mostra há quanto tempo a TSK está sem update (em vez do prazo) */
+  function rowFila(it, now, modo) {
+    var rest = it._rest != null ? it._rest : restOf(it, now), cor = it.pend ? COR.purple : corTempo(rest), pct = pctPrazo(it, now);
+    var tags = tagsDe(it, now);
+    var tempo = it.pend ? 'pendenciada' : (rest == null ? 'sem prazo' : (rest < 0 ? 'atrasada ' : 'vence em ') + fmtDur(rest)), extra = null;
+    if (modo === 'semupd') {
+      var hh = semUpdH(it, now), temUpd = it.upd && it.upd.estado !== 'sem' && it.upd.dt;
+      tempo = 'sem update há ' + fmtDur(hh * 60); cor = hh > 4 ? COR.red : COR.amber;
+      extra = h('span', { class: 'op-sub', text: (temUpd ? 'Último update: ' + fmtDM(it.upd.dt) : 'Nunca atualizada') + ' · ' + (rest == null ? 'sem prazo' : (rest < 0 ? 'atrasada ' : 'vence em ') + fmtDur(rest)) });
+    }
     var row = h('div', { class: 'op-row', dataset: { sel: it.os, osSel: it.os, end: it.end, site: it.site } }, [
       h('span', { class: 'op-p', style: { color: PRIO_COR[it.prio] || 'var(--tne-fg)' }, text: it.prio }),
       h('div', { style: { minWidth: 0 } }, [
         h('span', { class: 'op-tsk', dataset: { os: it.os }, text: it.os }), tags,
-        h('span', { class: 'op-sub', html: '<b>' + esc(it.site || '—') + '</b> · ' + esc(it.end || '—') + (it.cidade ? ' · ' + esc(it.cidade) : '') + (it.falha ? ' · ' + esc(it.falha) : '') })
+        h('span', { class: 'op-sub', html: '<b>' + esc(it.site || '—') + '</b> · ' + esc(it.end || '—') + (it.cidade ? ' · ' + esc(it.cidade) : '') + (it.falha ? ' · ' + esc(it.falha) : '') }),
+        extra
       ]),
       h('div', { class: 'op-time', style: { color: cor }, text: tempo }),
-      h('div', { class: 'op-bar', title: pct == null ? '' : Math.round(pct) + '% do prazo consumido' }, pct == null ? null : h('i', { style: { width: pct.toFixed(0) + '%', background: cor } }))
+      h('div', { class: 'op-bar', title: pct == null ? '' : Math.round(pct) + '% do prazo consumido' }, pct == null ? null : h('i', { style: { width: pct.toFixed(0) + '%', background: modo === 'semupd' ? corTempo(rest) : cor } }))
     ]);
     row.style.setProperty('--rc', cor);
     return row;
+  }
+  /* cartão do bloco de notas: cabeçalho "P · vencimento · TSK · site" e a linha do tempo dos updates */
+  function cardNota(it, now) {
+    var rest = it._rest != null ? it._rest : restOf(it, now), cor = it.pend ? COR.purple : corTempo(rest);
+    var ent = entradasDe(it), n = state.hist || 0, vis = n ? ent.slice(0, n) : ent;
+    var tempo = it.pend ? 'pendenciada' : (rest == null ? 'sem prazo' : (rest < 0 ? 'atrasada ' : 'vence em ') + fmtDur(rest));
+    var tl = h('div', { class: 'op-tl' }, vis.length
+      ? vis.map(function (e, i) { return h('div', { class: 'e' + (i === 0 ? ' atual' : '') }, [h('i'), h('time', { text: fmtDM(e.dt) }), h('span', { class: 'm', title: msg1(e.mensagem), text: msg1(e.mensagem) })]); })
+      : [h('div', { class: 'e vazio' }, [h('i'), h('time', { text: '—' }), h('span', { class: 'm', text: 'Sem atualização registrada' })])]);
+    if (ent.length > vis.length) tl.appendChild(h('div', { class: 'mais', text: '+ ' + (ent.length - vis.length) + ' mais antiga(s) — escolha "Histórico: Todas" para ver e copiar' }));
+    var copia = h('button', { class: 'op-copy mini', type: 'button', text: 'Copiar', title: 'Copiar esta TSK com a linha do tempo', onclick: function (e) { e.stopPropagation(); copiar(textoNota(it, state.hist), it.os + ' copiada'); } });
+    var card = h('div', { class: 'op-note', dataset: { sel: it.os, osSel: it.os, end: it.end, site: it.site } }, [
+      h('div', { class: 'op-nh' }, [
+        h('span', { class: 'op-p', style: { color: PRIO_COR[it.prio] || 'var(--tne-fg)' }, text: it.prio }),
+        h('span', { class: 'op-nv', style: { color: cor }, title: tempo, text: it.venc ? fmtDM(it.venc) : 'sem prazo' }),
+        h('span', { class: 'op-tsk', dataset: { os: it.os }, text: it.os }),
+        h('b', { class: 'op-ns', text: it.site || it.end || '—' }),
+        tagsDe(it, now), copia
+      ]),
+      h('span', { class: 'op-sub', text: tempo + (it.cidade ? ' · ' + it.cidade : '') + (it.falha ? ' · ' + it.falha : '') }),
+      tl
+    ]);
+    card.style.setProperty('--rc', cor);
+    return card;
   }
 
   function rowSite(s, now) {
@@ -742,7 +964,7 @@
     b.style.borderLeftColor = cor;
     return b;
   }
-  function setSit(s) { state.situacao = state.situacao === s ? 'TODAS' : s; state.lim = {}; saveState(); state.tab = 'fila'; render('lista'); }
+  function setSit(s) { state.situacao = state.situacao === s ? 'TODAS' : s; state.lim = {}; if (state.tab !== 'notas') state.tab = 'fila'; saveState(); render('lista'); }
   function setTab(t) { state.tab = t; saveState(); view.pop = false; if (t !== 'mapa') view.rotaAtiva = false; render(); }
 
   function topBar() {
@@ -752,6 +974,8 @@
       h('div', { class: 'op-live' }, [
         h('span', { class: 'op-dot' + (velho ? ' stale' : '') }),
         h('span', { id: 'op-age', text: savedAt ? ('Atualizado há ' + fmtDur(idade) + ' · ' + fmtDt(new Date(savedAt))) : 'Dados publicados' }),
+        h('button', { class: 'op-btn' + (state.som ? ' on' : ''), type: 'button', text: state.som ? 'Alerta sonoro: ligado' : 'Alerta sonoro: desligado',
+          title: 'Sirene quando entrar TSK nova na(s) região(ões) filtrada(s). O navegador só libera o som depois de um clique na página.', onclick: alternarSom }),
         h('button', { class: 'op-btn', type: 'button', text: '⬇ Excel', title: 'Exporta o que está filtrado, com resumo e atalhos entre as abas', onclick: exportarExcel }),
         h('button', { class: 'op-btn', type: 'button', text: '↻ Atualizar', onclick: function () { carregarDados(false, true); } }),
         h('button', { class: 'op-btn', type: 'button', text: document.body.classList.contains('op-tv') ? '✕ Sair do modo TV' : '📺 Modo TV', onclick: toggleTV })
@@ -784,7 +1008,7 @@
       return h('button', { class: 'op-tab' + (state.tab === id ? ' active' : ''), type: 'button', onclick: function () { setTab(id); } },
         [label, n != null ? num(n, 'tab:' + id, 'n') : null]);
     }
-    return h('div', { class: 'op-tabs' }, [t('fila', 'Fazer agora'), t('sites', 'Sites fora'), temCausa() ? t('causa', 'Causa comum') : null, temRetorno() ? t('retorno', 'Controle de Retorno') : null, t('b2b', 'B2B / Premium'), t('conc', 'Concentradores'), t('backbone', 'Backbone / LD'), t('mapa', 'Mapa')]);
+    return h('div', { class: 'op-tabs' }, [t('fila', 'Fazer agora'), t('notas', 'Bloco de notas'), t('semupd', 'Sem update +1h30'), t('sites', 'Sites fora'), temCausa() ? t('causa', 'Causa comum') : null, temRetorno() ? t('retorno', 'Controle de Retorno') : null, t('b2b', 'B2B / Premium'), t('conc', 'Concentradores'), t('backbone', 'Backbone / LD'), t('mapa', 'Mapa')]);
   }
 
   /* ---------- barra de filtros ---------- */
@@ -824,7 +1048,7 @@
         }));
     });
     var extras = h('span', { class: 'op-extras' });
-    if (tab === 'fila') {
+    if (tab === 'fila' || tab === 'notas') {
       var lbl = h('label', { class: 'op-chip op-tgl' }, [h('input', { type: 'checkbox' }), h('span', { text: 'Pendenciadas' })]);
       var cb = lbl.querySelector('input'); cb.checked = !!state.pend;
       cb.addEventListener('change', function () { state.pend = cb.checked; state.lim = {}; saveState(); render('lista'); });
@@ -836,7 +1060,7 @@
   function filtros(tab) {
     var wrap = h('div', { class: 'op-fwrap' });
     var bar = h('div', { class: 'op-filters' });
-    var comRegra = tab === 'fila' || tab === 'outra';
+    var comRegra = tab === 'fila' || tab === 'outra' || tab === 'notas' || tab === 'semupd';
     if (comRegra) {
       bar.appendChild(h('div', { class: 'op-seg' }, [['TODAS', 'Todas', ''], ['FIXA', 'FIXA', 'fixa'], ['MOVEL', 'MÓVEL', 'movel']].map(function (g) {
         var on = !state.regras.length && state.grupo === g[0];
@@ -851,10 +1075,17 @@
           var i = state.prios.indexOf(p); if (i >= 0) state.prios.splice(i, 1); else state.prios.push(p); state.lim = {}; saveState(); render('lista'); } }));
       });
     }
-    if (tab === 'fila') {
+    if (tab === 'notas') {          // quantas atualizações aparecem (e vão na cópia) em cada TSK
+      bar.appendChild(h('span', { class: 'op-sep' }));
+      bar.appendChild(h('span', { class: 'op-lbl', text: 'HISTÓRICO' }));
+      [[3, 'Últimas 3'], [5, 'Últimas 5'], [0, 'Todas']].forEach(function (o) {
+        bar.appendChild(h('button', { class: 'op-chip' + ((state.hist || 0) === o[0] ? ' on' : ''), type: 'button', text: o[1], onclick: function () { state.hist = o[0]; saveState(); render('lista'); } }));
+      });
+    }
+    if (tab === 'fila' || tab === 'notas') {
       bar.appendChild(h('span', { class: 'op-sep' }));
       var sit = h('select', { class: 'op-sel', title: 'Situação', onchange: function () { state.situacao = this.value; state.lim = {}; saveState(); render('lista'); } },
-        [['TODAS', 'Situação: todas'], ['NO_PRAZO', 'No prazo'], ['V2H', 'Vencem em até 2h'], ['VENCIDAS', 'Vencidas'], ['SEMUPD', 'Sem update há +4h']].map(function (o) { return h('option', { value: o[0], text: o[1] }); }));
+        [['TODAS', 'Situação: todas'], ['NOVAS', 'Novas (sem 1º update)'], ['NO_PRAZO', 'No prazo'], ['V2H', 'Vencem em até 2h'], ['VENCIDAS', 'Vencidas'], ['SEMUPD90', 'Sem update há +1h30'], ['SEMUPD', 'Sem update há +4h']].map(function (o) { return h('option', { value: o[0], text: o[1] }); }));
       sit.value = state.situacao; bar.appendChild(sit);
       var ord = h('select', { class: 'op-sel', title: 'Ordenação dentro de cada região', onchange: function () { state.ordem = this.value; saveState(); render('lista'); } },
         [['padrao', 'Ordem: P1→P5, no prazo antes'], ['venc', 'Ordem: vencimento (vão vencer)'], ['recentes', 'Ordem: mais recentes']].map(function (o) { return h('option', { value: o[0], text: o[1] }); }));
@@ -996,6 +1227,40 @@
         wrap.appendChild(col);
       });
       box.appendChild(wrap);
+    } else if (state.tab === 'notas') {
+      var fn = filaAtual(now);
+      if (!fn.filtrada.length) { box.appendChild(h('div', { class: 'op-empty', text: 'Nada na fila com esses filtros.' })); return; }
+      var wrapN = h('div', { class: 'op-blocks' + (state.lado && fn.blocos.length >= 2 ? ' cols' : '') });
+      fn.blocos.forEach(function (b) {
+        var nomeN = regiaoLabel(b.regiao), vencN = b.lista.filter(function (it) { return !it.pend && it._rest != null && it._rest < 0; }).length;
+        var btn = b.lista.length ? h('button', { class: 'op-copy', type: 'button', title: 'Copiar todas as TSKs desta região: P - VENCIMENTO - TSK / SITE e a linha do tempo das atualizações',
+          text: 'Copiar bloco completo — ' + nomeN + ' (' + b.lista.length + ')',
+          onclick: function (e) { e.stopPropagation(); copiar(b.lista.map(function (it) { return textoNota(it, state.hist); }).join('\n\n'), b.lista.length + ' TSK' + (b.lista.length > 1 ? 's' : '') + ' de ' + nomeN + ' copiada' + (b.lista.length > 1 ? 's' : '') + ' com a linha do tempo'); } }) : null;
+        var colN = blocoEl(nomeN, '<span>' + b.lista.length + ' TSKs</span>' + (vencN ? ' · <span style="color:' + COR.red + '">' + vencN + ' vencidas</span>' : ''), btn);
+        var bodyN = colN.querySelector('.op-bb'), limN = state.lim['N' + b.regiao] || PAGE;
+        if (!b.lista.length) bodyN.appendChild(h('div', { class: 'op-empty', style: { padding: '14px 0' }, text: 'Nada nesta região.' }));
+        b.lista.slice(0, limN).forEach(function (it) { bodyN.appendChild(cardNota(it, now)); });
+        if (b.lista.length > limN) bodyN.appendChild(h('button', { class: 'op-btn op-more', type: 'button', text: 'Mostrar mais (' + (b.lista.length - limN) + ')', onclick: function () { state.lim['N' + b.regiao] = limN + PAGE; renderLista(); } }));
+        wrapN.appendChild(colN);
+      });
+      box.appendChild(wrapN);
+    } else if (state.tab === 'semupd') {
+      var fs = semUpdAtual(now);
+      if (!fs.total) { box.appendChild(h('div', { class: 'op-empty', text: 'Nenhuma TSK sem update há mais de 1h30 com esses filtros.' })); return; }
+      var wrapS = h('div', { class: 'op-blocks' + (state.lado && fs.blocos.length >= 2 ? ' cols' : '') });
+      fs.blocos.forEach(function (b) {
+        var nomeS = regiaoLabel(b.regiao), acima4 = b.lista.filter(function (it) { return it._sem > 4; }).length;
+        var btnS = b.lista.length ? h('button', { class: 'op-copy', type: 'button', title: 'Copiar no formato: Prioridade -> TSK / SITE - FALHA - sem update há ...',
+          text: 'Copiar ' + nomeS + ' (' + b.lista.length + ')',
+          onclick: function (e) { e.stopPropagation(); copiar(b.lista.map(function (it) { return linhaCopia(it) + ' - sem update há ' + fmtDur(it._sem * 60); }).join('\n'), b.lista.length + ' TSK' + (b.lista.length > 1 ? 's' : '') + ' sem update de ' + nomeS + ' copiada' + (b.lista.length > 1 ? 's' : '')); } }) : null;
+        var colS = blocoEl(nomeS, '<span>' + b.lista.length + ' TSKs</span>' + (acima4 ? ' · <span style="color:' + COR.red + '">' + acima4 + ' acima de 4h</span>' : ''), btnS);
+        var bodyS = colS.querySelector('.op-bb'), limS = state.lim['U' + b.regiao] || PAGE;
+        if (!b.lista.length) bodyS.appendChild(h('div', { class: 'op-empty', style: { padding: '14px 0' }, text: 'Nada nesta região.' }));
+        b.lista.slice(0, limS).forEach(function (it) { bodyS.appendChild(rowFila(it, now, 'semupd')); });
+        if (b.lista.length > limS) bodyS.appendChild(h('button', { class: 'op-btn op-more', type: 'button', text: 'Mostrar mais (' + (b.lista.length - limS) + ')', onclick: function () { state.lim['U' + b.regiao] = limS + PAGE; renderLista(); } }));
+        wrapS.appendChild(colS);
+      });
+      box.appendChild(wrapS);
     } else if (state.tab === 'sites') {
       var ss = sitesAtuais();
       if (!ss.length) { box.appendChild(h('div', { class: 'op-empty', text: 'Nenhum site fora com esses filtros. 👏' })); return; }
@@ -1399,15 +1664,17 @@
     var sitesTodos = sitesAtuais(), nSem = somaSites(sitesTodos, function (s) { return !s.tsk; }), nSitesTot = somaSites(sitesTodos);
     var baseNP = f.base.filter(function (it) { return !it.pend; });
     var nVenc = baseNP.filter(function (it) { return it._rest != null && it._rest < 0; }).length;
-    document.title = (nVenc ? '(' + nVenc + ') ' : '') + 'Operação TNE';
+    view.tituloBase = (nVenc ? '(' + nVenc + ') ' : '') + 'Operação TNE'; document.title = view.tituloBase;
     var b2b = baseNP.filter(function (it) { return it.b2b; }).length, bb = baseNP.filter(function (it) { return it.backbone; }).length, conc = concAlertas();
+    var sem90 = baseNP.filter(function (it) { return semUpdH(it, now) > UPD_LIM_H; }).length, nNovas = novasEscopo().length;
 
     root.appendChild(topBar());
     banners().forEach(function (b) { root.appendChild(b); });
+    var faixa = faixaAlerta(); if (faixa) root.appendChild(faixa);
     var resCausa = temCausa() ? TNE.causaComum.analisar(dadosCausa()) : null;
-    root.appendChild(tabs({ fila: f.filtrada.length, sites: nSitesTot, causa: resCausa ? resCausa.suspeitos.length + (resCausa.pais || []).length : null, retorno: raw.retornoCompacto ? raw.retornoCompacto.filter(function (x) { return x.b; }).length : null, b2b: b2b, conc: raw.concentradores ? conc : null, backbone: bb }));
+    root.appendChild(tabs({ fila: f.filtrada.length, notas: f.filtrada.length, semupd: sem90, sites: nSitesTot, causa: resCausa ? resCausa.suspeitos.length + (resCausa.pais || []).length : null, retorno: raw.retornoCompacto ? raw.retornoCompacto.filter(function (x) { return x.b; }).length : null, b2b: b2b, conc: raw.concentradores ? conc : null, backbone: bb }));
 
-    if (state.tab === 'fila' || state.tab === 'sites') {
+    if (state.tab === 'fila' || state.tab === 'sites' || state.tab === 'notas' || state.tab === 'semupd') {
       var v2h = baseNP.filter(function (it) { return it._rest != null && it._rest >= 0 && it._rest <= 120; }).length;
       var prazo = baseNP.filter(function (it) { return it._rest != null && it._rest >= 0; }).length;
       var semUpd = baseNP.filter(function (it) { return semUpdH(it, now) > 4; }).length;
@@ -1415,6 +1682,8 @@
         kpi(nVenc, 'Vencidas', COR.red, state.situacao === 'VENCIDAS', function () { setSit('VENCIDAS'); }),
         kpi(v2h, 'Vencem em até 2h', COR.amber, state.situacao === 'V2H', function () { setSit('V2H'); }),
         kpi(prazo, 'No prazo', COR.green, state.situacao === 'NO_PRAZO', function () { setSit('NO_PRAZO'); }),
+        kpi(nNovas, 'Novas', COR.red, state.situacao === 'NOVAS', function () { setSit('NOVAS'); }, 'aguardando o 1º update'),
+        kpi(sem90, 'Sem update +1h30', COR.amber, state.tab === 'semupd', function () { setTab(state.tab === 'semupd' ? 'fila' : 'semupd'); }),
         kpi(semUpd, 'Sem update +4h', COR.orange, state.situacao === 'SEMUPD', function () { setSit('SEMUPD'); }),
         kpi(nSitesTot, 'Sites fora', COR.red, state.tab === 'sites', function () { setTab(state.tab === 'sites' ? 'fila' : 'sites'); }, nSem + ' sem TSK · ' + sitesTodos.length + ' END_IDs'),
         kpi(b2b, 'B2B / Premium', COR.purple, false, function () { setTab('b2b'); }),
@@ -1467,12 +1736,22 @@
   setInterval(function () { carregarDados(true); }, POLL_MS);
   setInterval(function () {
     if (!model) return;
-    if (state.tab === 'fila' || state.tab === 'sites') {
+    if (state.tab === 'fila' || state.tab === 'sites' || state.tab === 'notas' || state.tab === 'semupd') {
       var a = document.activeElement;
       if ((a && (a.classList.contains('op-search') || a.tagName === 'SELECT')) || view.pop || view.modal || tipPin || (TNE.causaComum && TNE.causaComum.vendoDiagrama)) { atualizarIdade(); return; }   // não interromper
       render(true);
     } else atualizarIdade();
   }, TICK_MS);
+  /* alerta: libera o som no primeiro clique e faz o título piscar enquanto houver TSK nova sem 1º update (o som toca só quando a TSK cai) */
+  document.addEventListener('pointerdown', function () {
+    if (state.som && (!audio.ctx || audio.ctx.state !== 'running')) liberarAudio().then(function (ok) { if (alerta.bloqueado === ok) { alerta.bloqueado = !ok; atualizarFaixaAlerta(); } });
+  }, true);
+  var pisca = false;
+  setInterval(function () {
+    var n = model ? novasEscopo().length : 0;
+    if (n) { pisca = !pisca; document.title = pisca ? '(!) ' + n + (n > 1 ? ' NOVAS' : ' NOVA') + ' - Operação TNE' : (view.tituloBase || 'Operação TNE'); }
+    else if (view.tituloBase && document.title !== view.tituloBase) document.title = view.tituloBase;
+  }, 1500);
   abrirComCache();
   carregarDados(false);
 })();
