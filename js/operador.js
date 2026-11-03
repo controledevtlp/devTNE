@@ -51,8 +51,8 @@
      Continua nova (e o alerta continua na tela) até receber o PRIMEIRO update — ou sair da fila.
      A primeira abertura só registra o que já existe (não alerta o backlog inteiro).
      O alerta vale para a(s) região(ões) filtrada(s); sem filtro de região, vale para todas. */
-  var LS_VISTAS = 'tne_operador_vistas', LS_NOVAS = 'tne_operador_novas';
-  var vistas = lsGet(LS_VISTAS), novas = lsGet(LS_NOVAS) || {};       // os -> instante em que foi vista / detectada como nova
+  var det = TNE.alertaNovas.detector('tne_operador');     // regra de "nova" + memória do aparelho (js/alerta-novas.js, a mesma do dashboard)
+  var novas = det.novas;                                    // os -> instante em que foi detectada como nova
   var alerta = { soneca: 0, bloqueado: false };
   var audio = { ctx: null, fontes: [], buf: undefined };
   /* toque do alerta: a gravação do operador. Salve o arquivo em assets/ com um destes nomes (a 1ª que existir é usada);
@@ -60,23 +60,8 @@
   var AUDIO_ALERTA = ['assets/alerta-operador.mp3', 'assets/alerta-operador.wav', 'assets/alerta-operador.ogg', 'assets/alerta-operador.m4a'];
 
   function detectarNovas() {
-    var agora = Date.now(), primeira = !vistas, achadas = [];
-    vistas = vistas || {};
-    model.items.forEach(function (it) {
-      if (it.pend) return;
-      var os = up(it.os); if (!os) return;
-      if (!(os in vistas)) {
-        vistas[os] = agora;
-        if (!primeira && it.upd.estado === 'sem' && !(os in novas)) { novas[os] = agora; achadas.push(it); }
-      }
-    });
-    Object.keys(novas).forEach(function (os) {          // sai da lista quando recebe o 1º update ou deixa a fila
-      var it = model.byOs[os];
-      if (!it || it.pend || it.upd.estado !== 'sem') delete novas[os];
-    });
-    Object.keys(vistas).forEach(function (os) { if (!model.byOs[os] && agora - vistas[os] > 72 * 3600000) delete vistas[os]; });
-    try { localStorage.setItem(LS_VISTAS, JSON.stringify(vistas)); localStorage.setItem(LS_NOVAS, JSON.stringify(novas)); } catch (e) {}
-    return achadas;
+    var chaves = det.detectar(model.items.map(function (it) { return { os: up(it.os), pend: it.pend, semUpd: it.upd.estado === 'sem' }; }));
+    return chaves.map(function (os) { return model.byOs[os]; }).filter(Boolean);
   }
   /* mesmo critério do filtro FIXA / MÓVEL (e das "Regras criadoras") da fila: sem filtro de equipe, vale para todas */
   function passaGrupo(it) {
@@ -170,7 +155,14 @@
       return h('span', { class: 'op-achip' }, [h('b', { style: { color: PRIO_COR[it.prio] || 'inherit' }, text: it.prio }), h('span', { class: 'op-tsk', dataset: { os: it.os }, text: it.os }), h('span', { text: it.site || it.end || '—' })]);
     });
     if (lista.length > 10) chips.push(h('span', { class: 'op-achip', text: '+ ' + (lista.length - 10) }));
-    var acts = [h('button', { class: 'op-btn', type: 'button', text: 'Ver só as novas', onclick: function () { setSit('NOVAS'); } })];
+    var acts = [
+      h('button', { class: 'op-btn', type: 'button', text: 'Copiar para acionar', title: 'Copia TODAS as TSKs desta faixa (respeita região, FIXA/MÓVEL e prioridades do alerta), separadas por região: *PRIORIDADE* - TSK / SITE - ACIONAR',
+        onclick: function () {
+          copiar(TNE.alertaNovas.textoAcionar(lista.map(function (it) { return { prio: it.prio, tsk: it.os, site: it.site, end: it.end, regiao: it.regiao }; })),
+            lista.length + (lista.length > 1 ? ' TSKs novas copiadas' : ' TSK nova copiada') + ' (por região)');
+        } }),
+      h('button', { class: 'op-btn', type: 'button', text: 'Ver só as novas', onclick: function () { setSit('NOVAS'); } })
+    ];
     if (state.som && !calada) acts.push(h('button', { class: 'op-btn', type: 'button', text: 'Silenciar 10 min', title: 'Cala a sirene; o alerta na tela continua até o 1º update', onclick: silenciar }));
     if (!state.som) acts.push(h('button', { class: 'op-btn go', type: 'button', text: 'Ligar alerta sonoro', onclick: alternarSom }));
     var dica = null;
