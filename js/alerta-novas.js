@@ -123,7 +123,7 @@
         var chips = lista.slice(0, 12).map(function (it) {
           return h('span', { class: 'op-achip' }, [
             h('b', { style: { color: PRIO_COR[it.prio] || 'inherit' }, text: it.prio }),
-            h('span', { class: 'op-tsk', style: { cursor: 'pointer' }, title: 'Clique para copiar a TSK', text: it.osRaw, onclick: function () { U.copyText(it.osRaw, it.osRaw + ' copiada'); } }),
+            h('span', { class: 'op-tsk', style: { cursor: 'pointer' }, dataset: { os: it.osRaw }, title: 'Clique: copiar a TSK · passe o mouse para ver os detalhes · botão direito fixa o balão', text: it.osRaw, onclick: function () { U.copyText(it.osRaw, it.osRaw + ' copiada'); } }),
             h('span', { text: it.site || it.end || '—' })
           ]);
         });
